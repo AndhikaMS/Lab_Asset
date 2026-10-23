@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Aset · {{ asset.nama_aset }}{% endblock %}
+
+{% block content %}
+<!-- Page Heading -->
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="m14.5 7.5 3 3"/></svg>
+            Edit Informasi Aset
+        </span>
+        <h1>{{ asset.nama_aset }}</h1>
+        <p>Perbarui komponen kode, rincian atribut, foto fisik, atau metrik finansial aset.</p>
+    </div>
+    <div class="heading-actions">
+        <a href="{{ url_for('main.detail_asset', id=asset.id) }}" class="btn btn-outline">Batal</a>
+        <button type="submit" form="formEditAset" class="btn btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Simpan Perubahan
+        </button>
+    </div>
+</div>
+
+<form id="formEditAset" method="POST" enctype="multipart/form-data" class="create-form-structured">
+    <!-- BAGIAN 1: FOTO FISIK (KIRI) & IDENTITAS (KANAN) -->
+    <div class="form-split-row">
+        <!-- Kolom Kiri: Foto Fisik Barang -->
+        <div class="form-side-photo">
+            <section class="panel">
+                <div class="panel-title">
+                    <span>Dokumentasi Foto Fisik</span>
+                </div>
+                <div class="panel-body">
+                    <div class="photo-preview-box" id="photoPreviewContainer">
+                        {% if asset.foto_path %}
+                        <img id="photoPreviewImg" src="{{ url_for('static', filename=asset.foto_path) }}" alt="{{ asset.nama_aset }}">
+                        <span id="photoPlaceholderText" style="display: none;"></span>
+                        {% else %}
+                        <span id="photoPlaceholderText" style="font-size: 12px; color: var(--slate-400); text-align: center; padding: 12px;">
+                            📷 Belum ada foto fisik
+                        </span>
+                        <img id="photoPreviewImg" src="" alt="Preview Foto" style="display: none;">
+                        {% endif %}
+                    </div>
+                    <div class="photo-meta-info">
+                        <strong>Perbarui Foto Perangkat</strong>
+                        <p>Format JPG atau PNG (maks 5 MB). Pilih berkas baru untuk mengganti foto sebelumnya.</p>
+                        <label class="btn btn-outline" style="cursor: pointer; width: 100%; justify-content: center; margin-top: 6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            Ganti Foto Barang
+                            <input type="file" name="foto" accept="image/jpeg,image/png" onchange="previewPhoto(this)" style="display: none;">
+                        </label>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Kolom Kanan: 1. Identitas & Lokasi Aset -->
+        <div class="form-main-fields">
+            <section class="panel" style="margin-bottom: 0;">
+                <div class="panel-title">
+                    <span>1. Identitas &amp; Lokasi Aset</span>
+                </div>
+                <div class="panel-body">
+                    <div style="display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px;">
+                        <label class="field">
+                            <span>Nama Aset Lengkap *</span>
+                            <input type="text" name="nama_aset" required value="{{ asset.nama_aset }}">
+                        </label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <label class="field">
+                                <span>Kategori Barang *</span>
+                                <select name="kategori_id" required>
+                                    {% for cat in categories %}
+                                    <option value="{{ cat.id }}" {% if asset.kategori_id == cat.id %}selected{% endif %}>{{ cat.nama_kategori }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <label class="field">
+                                <span>Penempatan Laboratorium *</span>
+                                <select name="lokasi_id" required>
+                                    {% for loc in locations %}
+                                    <option value="{{ loc.id }}" {% if asset.lokasi_id == loc.id %}selected{% endif %}>{{ loc.nama_lab }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                        </div>
+                        <label class="field">
+                            <span>Deskripsi &amp; Spesifikasi Teknis</span>
+                            <textarea name="deskripsi">{{ asset.deskripsi or '' }}</textarea>
+                        </label>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- BAGIAN 2: ARSITEKTUR KODE INVENTARIS 27-DIGIT -->
+    <section class="panel">
+        <div class="panel-title">
+            <span>2. Arsitektur Kode Inventaris (Standar 27 Digit)</span>
+            <span class="code-badge">12 Digit Lokasi + 15 Digit Barang</span>
+        </div>
+        <div class="panel-body">
+            <div class="code-sections">
+                <!-- 2.1 Komponen Kode Lokasi (12 Digit) -->
+                <div class="code-component-section">
+                    <div class="code-component-heading">
+                        <div>
+                            <h3>Komponen Kode Lokasi</h3>
+                            <p>Yayasan, Rektorat, Fakultas, Program Studi, dan Ruangan.</p>
+                        </div>
+                        <span class="code-badge">12 Digit</span>
+                    </div>
+                    <div class="code-fields">
+                        <label class="code-field">
+                            <span>Yayasan (4 Digit)</span>
+                            <input type="text" id="cYayasan" name="code_yayasan" maxlength="4" pattern="\d{4}" required placeholder="1001" value="{{ components.yayasan }}" oninput="updateCodePreview()">
+                            <small>4 digit</small>
+                        </label>
+                        <label class="code-field">
+                            <span>Rektorat (2 Digit)</span>
+                            <input type="text" id="cRektorat" name="code_rektorat" maxlength="2" pattern="\d{2}" required placeholder="01" value="{{ components.rektorat }}" oninput="updateCodePreview()">
+                            <small>2 digit</small>
+                        </label>
+                        <label class="code-field">
+                            <span>Fakultas (2 Digit)</span>
+                            <input type="text" id="cFakultas" name="code_fakultas" maxlength="2" pattern="\d{2}" required placeholder="02" value="{{ components.fakultas }}" oninput="updateCodePreview()">
+                            <small>2 digit</small>
+                        </label>
+                        <label class="code-field" style="flex: 1.5;">
+                            <span>Program Studi (2 Digit)</span>
+                            <select id="cProdi" name="prodi_id" required onchange="updateCodePreview()" style="font-weight: 700; font-family: var(--font-mono); height: 42px;">
+                                <option value="">Pilih Program Studi...</option>
+                                {% for p in prodis %}
+                                <option value="{{ p.id }}" data-kode="{{ p.kode_aset }}" {% if asset.prodi_id == p.id %}selected{% endif %}>
+                                    {{ p.kode_aset }} · {{ p.nama_prodi }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small>2 digit (Master)</small>
+                        </label>
+                        <label class="code-field">
+                            <span>Ruangan (2 Digit)</span>
+                            <input type="text" id="cLokasi" name="code_lokasi" maxlength="2" pattern="\d{2}" required placeholder="01" value="{{ components.lokasi }}" oninput="updateCodePreview()">
+                            <small>2 digit</small>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 2.2 Komponen Kode Barang (15 Digit) -->
+                <div class="code-component-section">
+                    <div class="code-component-heading">
+                        <div>
+                            <h3>Komponen Kode Barang</h3>
+                            <p>Golongan, Bidang, Kelompok, Sub-Kelompok, Tahun Perolehan, Urutan Ruang, dan No. Registrasi.</p>
+                        </div>
+                        <span class="code-badge">15 Digit</span>
+                    </div>
+                    <div class="code-fields">
+                        <label class="code-field">
+                            <span>Golongan</span>
+                            <input type="text" id="cGol" name="code_golongan" maxlength="2" pattern="\d{2}" required placeholder="01" value="{{ components.golongan }}" oninput="updateCodePreview()">
+                            <small>2 digit</small>
+                        </label>
+                        <label class="code-field">
+                            <span>Bidang</span>
+                            <input type="text" id="cBid" name="code_bidang" maxlength="2" pattern="\d{2}" required placeholder="02" value="{{ components.bidang }}" oninput="updateCodePreview()">
+                            <small>2 digit</small>
+                        </label>
+                        <label class="code-field">
+                            <span>Kelompok</span>
+                            <input type="text" id="cKel" name="code_kelompok" maxlength="2" pattern="\d{2}" required placeholder="03" value="{{ components.kelompok }}" oninput="updateCodePreview()">
+                            <small>2 digit</small>
+                        </label>
+                        <label class="code-field">
+                            <span>Sub-Kelompok</span>
+                            <input type="text" id="cSub" name="code_subkel" maxlength="2" pattern="\d{2}" required placeholder="04" value="{{ components.subkelompok }}" oninput="updateCodePreview()">
+                            <small>2 digit</small>
+                        </label>
+                        <label class="code-field">
+                            <span>Tahun Perolehan</span>
+                            <input type="text" id="cTahun" name="code_tahun" maxlength="4" pattern="\d{4}" required placeholder="2023" value="{{ components.tahun }}" oninput="updateCodePreview()">
+                            <small>4 digit</small>
+                        </label>
+                        <label class="code-field">
+                            <span>Urutan Ruang</span>
+                            <input type="text" id="cUrutLok" name="code_urutan_lok" maxlength="1" pattern="\d{1}" required placeholder="1" value="{{ components.urutan_lokasi }}" oninput="updateCodePreview()">
+                            <small>1 digit</small>
+                        </label>
+                        <label class="code-field">
+                            <span>No. Registrasi</span>
+                            <input type="text" id="cNoUrut" name="code_nomor_urut" maxlength="2" pattern="\d{2}" required placeholder="01" value="{{ components.nomor_urut }}" oninput="updateCodePreview()">
+                            <small>2 digit</small>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Live Generated Code Preview Banner -->
+                <div class="code-preview-banner">
+                    <div>
+                        <span>Preview Kode Aset Terkini</span>
+                        <div id="fullCodePreview" style="font-family: var(--font-mono); font-size: 19px; font-weight: 800; color: #38bdf8; letter-spacing: 0.12em; margin-top: 2px;">
+                            {{ asset.kode_aset }}
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span id="digitCountBadge" class="badge badge-success">27 / 27 Digit Lengkap</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- BAGIAN 3: PARAMETER FINANSIAL & PENILAIAN KELAYAKAN -->
+    <section class="panel">
+        <div class="panel-title">
+            <span>3. Parameter Finansial &amp; Penilaian Kelayakan</span>
+        </div>
+        <div class="panel-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px;">
+                <label class="field">
+                    <span>Harga Perolehan (Rp) *</span>
+                    <input type="number" name="harga_perolehan" min="0" step="1000" required value="{{ asset.harga_perolehan or 0 }}">
+                </label>
+                <label class="field">
+                    <span>Masa Manfaat / Umur Ekonomis (Tahun) *</span>
+                    <input type="number" name="umur_ekonomis" min="1" max="50" required value="{{ asset.umur_ekonomis or 5 }}">
+                </label>
+                <label class="field">
+                    <span>Estimasi Nilai Residu (Rp)</span>
+                    <input type="number" name="nilai_residu" min="0" step="1000" value="{{ asset.nilai_residu or 0 }}">
+                </label>
+                <label class="field">
+                    <span>Skor Kerusakan Fisik (Kriteria C2) *</span>
+                    <select name="skor_kerusakan" required>
+                        <option value="1" {% if asset.skor_kerusakan == 1 or not asset.skor_kerusakan %}selected{% endif %}>1 · Baik (Kondisi Prima)</option>
+                        <option value="2" {% if asset.skor_kerusakan == 2 %}selected{% endif %}>2 · Rusak Ringan (Perlu Servis)</option>
+                        <option value="3" {% if asset.skor_kerusakan >= 3 %}selected{% endif %}>3 · Rusak Berat (Kritis / Ganti)</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+    </section>
+
+    <!-- Form Bottom Actions -->
+    <div class="form-action-footer">
+        <a href="{{ url_for('main.detail_asset', id=asset.id) }}" class="btn btn-outline">Batal</a>
+        <button type="submit" class="btn btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Simpan Perubahan Aset
+        </button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateCodePreview() {
+    const cYayasan = document.getElementById('cYayasan').value || '----';
+    const cRektorat = document.getElementById('cRektorat').value || '--';
+    const cFakultas = document.getElementById('cFakultas').value || '--';
+    const prodiSelect = document.getElementById('cProdi');
+    const selectedProdiOpt = prodiSelect.options[prodiSelect.selectedIndex];
+    const cProdi = (selectedProdiOpt && selectedProdiOpt.dataset.kode) ? selectedProdiOpt.dataset.kode : '--';
+    const cLokasi = document.getElementById('cLokasi').value || '--';
+
+    const cGol = document.getElementById('cGol').value || '--';
+    const cBid = document.getElementById('cBid').value || '--';
+    const cKel = document.getElementById('cKel').value || '--';
+    const cSub = document.getElementById('cSub').value || '--';
+    const cTahun = document.getElementById('cTahun').value || '----';
+    const cUrutLok = document.getElementById('cUrutLok').value || '-';
+    const cNoUrut = document.getElementById('cNoUrut').value || '--';
+
+    const full = `${cYayasan} ${cRektorat} ${cFakultas} ${cProdi} ${cLokasi} ${cGol} ${cBid} ${cKel} ${cSub} ${cTahun} ${cUrutLok}${cNoUrut}`;
+    document.getElementById('fullCodePreview').innerText = full;
+
+    const pure = `${cYayasan}${cRektorat}${cFakultas}${cProdi}${cLokasi}${cGol}${cBid}${cKel}${cSub}${cTahun}${cUrutLok}${cNoUrut}`.replace(/-/g, '');
+    const badge = document.getElementById('digitCountBadge');
+    if (pure.length === 27) {
+        badge.className = 'badge badge-success';
+        badge.innerText = '27 / 27 Digit Lengkap';
+    } else {
+        badge.className = 'badge badge-warning';
+        badge.innerText = `${pure.length} / 27 Digit Terisi`;
+    }
+}
+
+function previewPhoto(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = document.getElementById('photoPreviewImg');
+            const placeholder = document.getElementById('photoPlaceholderText');
+            img.src = e.target.result;
+            img.style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', updateCodePreview);
+</script>
+{% endblock %}

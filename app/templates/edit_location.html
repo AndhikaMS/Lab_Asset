@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Lokasi · Lab Asset Management{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <div class="page-heading">
+        <div>
+            <span class="eyebrow">Data Master</span>
+            <h1>Edit Lokasi: {{ loc.nama_lab }}</h1>
+            <p>Perbarui identitas ruangan dan kapasitas laboratorium.</p>
+        </div>
+        <div class="heading-actions">
+            <a href="{{ url_for('main.locations') }}" class="btn btn-outline">← Kembali</a>
+        </div>
+    </div>
+
+    <section class="panel">
+        <div class="panel-title">
+            <span>Detail Ruangan Lab</span>
+        </div>
+        <div class="panel-body">
+            <form method="POST">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                    <label class="field">
+                        <span>Kode Lab (ID Unik) *</span>
+                        <input type="text" name="kode_lab" value="{{ loc.kode_lab }}" required>
+                    </label>
+                    <label class="field">
+                        <span>Nama Laboratorium *</span>
+                        <input type="text" name="nama_lab" value="{{ loc.nama_lab }}" required>
+                    </label>
+                    <label class="field">
+                        <span>Kode Aset (Digit Lokasi)</span>
+                        <input type="text" name="kode_aset" value="{{ loc.kode_aset or '' }}">
+                    </label>
+                    <label class="field">
+                        <span>Kapasitas (Unit) *</span>
+                        <input type="number" name="kapasitas" min="1" value="{{ loc.kapasitas }}" required>
+                    </label>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <a href="{{ url_for('main.locations') }}" class="btn btn-outline">Batal</a>
+                    <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+{% endblock %}

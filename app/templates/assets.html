@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}Katalog Data Aset · Lab Asset Management{% endblock %}
+
+{% block content %}
+<!-- Page Heading -->
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4.5 7.8 7.5 4.3 7.5-4.3M12 12v9"/></svg>
+            Inventaris Laboratorium
+        </span>
+        <h1>Katalog Aset Aktif</h1>
+        <p>Menampilkan {{ total_found }} dari total {{ total_all }} aset yang terdaftar dalam inventaris.</p>
+    </div>
+    <div class="heading-actions">
+        <!-- Search Form -->
+        <form method="GET" action="{{ url_for('main.assets') }}" style="display: flex; gap: 8px;">
+            <input type="text" name="q" value="{{ request.args.get('q', '') }}" placeholder="Cari nama, kode 27-digit..." style="width: 240px; padding: 8px 14px; font-size: 13px;">
+            <button type="submit" class="btn btn-outline">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                Cari
+            </button>
+        </form>
+
+        <button type="button" class="btn btn-outline {% if request.args.get('location') or request.args.get('category') or request.args.get('prodi') or request.args.get('kondisi') or request.args.get('tahun') %}active{% endif %}" onclick="toggleFilters()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Filter {% if request.args.get('location') or request.args.get('category') or request.args.get('prodi') or request.args.get('kondisi') or request.args.get('tahun') %}(Aktif){% endif %}
+        </button>
+
+        {% if has_permission('print_reports') %}
+        <a href="{{ url_for('main.print_all_labels', location=request.args.get('location'), category=request.args.get('category')) }}" target="_blank" class="btn btn-cyan">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Cetak Label
+        </a>
+        <a href="{{ url_for('main.print_inventory_select') }}" target="_blank" class="btn btn-outline">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Cetak Laporan
+        </a>
+        {% endif %}
+
+        {% if has_permission('edit_assets') %}
+        <a href="{{ url_for('main.create_asset') }}" class="btn btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            + Tambah Aset
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Expandable Filters Panel -->
+<section id="filterSection" class="asset-filters" style="display: {% if request.args.get('location') or request.args.get('category') or request.args.get('prodi') or request.args.get('kondisi') or request.args.get('tahun') %}block{% else %}none{% endif %};">
+    <form method="GET" action="{{ url_for('main.assets') }}">
+        {% if request.args.get('q') %}
+        <input type="hidden" name="q" value="{{ request.args.get('q') }}">
+        {% endif %}
+        <div class="asset-filter-grid">
+            <label class="field">
+                <span>Kategori Aset</span>
+                <select name="category" onchange="this.form.submit()">
+                    <option value="">Semua Kategori</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if request.args.get('category') == cat.id|string %}selected{% endif %}>{{ cat.nama_kategori }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label class="field">
+                <span>Lokasi Laboratorium</span>
+                <select name="location" onchange="this.form.submit()">
+                    <option value="">Semua Ruangan Lab</option>
+                    {% for loc in locations %}
+                    <option value="{{ loc.id }}" {% if request.args.get('location') == loc.id|string %}selected{% endif %}>{{ loc.nama_lab }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label class="field">
+                <span>Program Studi (Prodi)</span>
+                <select name="prodi" onchange="this.form.submit()">
+                    <option value="">Semua Program Studi</option>
+                    {% for p in prodis %}
+                    <option value="{{ p.id }}" {% if request.args.get('prodi') == p.id|string %}selected{% endif %}>{{ p.nama_prodi }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label class="field">
+                <span>Kondisi Fisik / Kerusakan</span>
+                <select name="kondisi" onchange="this.form.submit()">
+                    <option value="">Semua Kondisi</option>
+                    <option value="Baik" {% if request.args.get('kondisi') == 'Baik' %}selected{% endif %}>1 · Baik</option>
+                    <option value="Rusak Ringan" {% if request.args.get('kondisi') == 'Rusak Ringan' %}selected{% endif %}>2 · Rusak Ringan</option>
+                    <option value="Rusak Berat" {% if request.args.get('kondisi') == 'Rusak Berat' %}selected{% endif %}>3 · Rusak Berat</option>
+                </select>
+            </label>
+
+            <label class="field">
+                <span>Tahun Pengadaan</span>
+                <select name="tahun" onchange="this.form.submit()">
+                    <option value="">Semua Tahun</option>
+                    {% for yr in available_years %}
+                    <option value="{{ yr }}" {% if request.args.get('tahun') == yr|string %}selected{% endif %}>Tahun {{ yr }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </div>
+
+        <div class="asset-filter-footer">
+            <span>Filter diterapkan pada pencarian saat ini.</span>
+            <div style="display: flex; gap: 8px;">
+                <a href="{{ url_for('main.assets') }}" class="btn btn-outline btn-sm">Reset Filter</a>
+                <button type="submit" class="btn btn-primary btn-sm">Terapkan</button>
+            </div>
+        </div>
+    </form>
+</section>
+
+<!-- Bulk Selection Bar (Matching Wireframe) -->
+<div id="selectionBar" class="asset-selection-bar" style="display: none;">
+    <span id="selectedCountText">0 aset dipilih</span>
+    <div class="asset-selection-actions">
+        <button type="button" class="btn btn-cyan btn-sm" onclick="printSelectedQR()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Cetak Label Terpilih
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="clearSelection()" style="color: white; border-color: rgba(255,255,255,0.3); background: transparent;">
+            Batal Pilih
+        </button>
+    </div>
+</div>
+
+<!-- Asset Table Container -->
+<div class="table-container">
+    <div class="table-scroll">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px; text-align: center;">
+                        <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" style="cursor: pointer; width: 16px; height: 16px;">
+                    </th>
+                    <th>Nama Aset &amp; Kategori</th>
+                    <th>Kode 27-Digit &amp; Lokasi</th>
+                    <th>Ruangan &amp; Pemilik</th>
+                    <th>Nilai &amp; Kondisi Finansial</th>
+                    <th>Tahun &amp; Servis</th>
+                    <th style="text-align: right; width: 160px;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in assets %}
+                <tr>
+                    <td style="text-align: center;">
+                        <input type="checkbox" class="asset-select-cb" value="{{ a.id }}" data-kode="{{ a.kode_aset }}" onchange="updateSelectionState()" style="cursor: pointer; width: 16px; height: 16px;">
+                    </td>
+                    <td>
+                        <div class="asset-identity">
+                            <div class="asset-thumb {% if a.kondisi == 'Rusak Berat' %}danger{% elif 'PC' in a.nama_aset or 'Dell' in a.nama_aset %}desktop{% elif 'Switch' in a.nama_aset %}network{% else %}desktop{% endif %}">
+                                {% if 'PC' in a.nama_aset or 'Dell' in a.nama_aset %}💻{% elif 'Monitor' in a.nama_aset or 'Display' in a.nama_aset %}🖥️{% elif 'Switch' in a.nama_aset or 'Router' in a.nama_aset %}🌐{% else %}📦{% endif %}
+                            </div>
+                            <div class="asset-identity-text">
+                                <a href="{{ url_for('main.detail_asset', id=a.id) }}" style="font-weight: 700; color: var(--slate-900); font-size: 13.5px;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--slate-900)'">
+                                    {{ a.nama_aset }}
+                                </a>
+                                <small>{{ a.category.nama_kategori if a.category else 'Tanpa Kategori' }}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--slate-900);">
+                            {{ a.format_label() }}
+                        </div>
+                        <small style="color: var(--slate-500); font-size: 10.5px; font-family: var(--font-mono);">
+                            Raw: {{ a.kode_aset }}
+                        </small>
+                    </td>
+                    <td>
+                        <strong style="display: block; font-size: 13px; color: var(--slate-900);">{{ a.location.nama_lab if a.location else '-' }}</strong>
+                        <small style="color: var(--slate-500);">{{ a.prodi.nama_prodi if a.prodi else 'Fakultas / Lab' }}</small>
+                    </td>
+                    <td>
+                        <div class="money-lines">
+                            <span>Perolehan: <strong>Rp {{ "{:,.0f}".format(a.harga_perolehan or 0).replace(',', '.') }}</strong></span>
+                            <span>Nilai Buku: <strong style="color: var(--emerald-600);">Rp {{ "{:,.0f}".format(a.nilai_buku()).replace(',', '.') }}</strong></span>
+                            <span>Kondisi: 
+                                <span class="badge {% if a.kondisi == 'Baik' %}badge-success{% elif a.kondisi == 'Rusak Berat' %}badge-danger{% else %}badge-warning{% endif %}" style="padding: 1px 6px; font-size: 10px;">
+                                    {{ a.kondisi or 'Baik' }}
+                                </span>
+                            </span>
+                        </div>
+                    </td>
+                    <td>
+                        <strong style="display: block; font-size: 13px; color: var(--slate-900);">Tahun {{ a.tahun_pengadaan or '-' }}</strong>
+                        <small style="color: var(--slate-500);">
+                            {% if a.perbaikan_list %}
+                            {{ a.perbaikan_list|length }}x servis (Rp {{ "{:,.0f}".format(a.biaya_perawatan or 0).replace(',', '.') }})
+                            {% else %}
+                            Belum ada servis
+                            {% endif %}
+                        </small>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 6px;">
+                            <a href="{{ url_for('main.detail_asset', id=a.id) }}" class="icon-btn" title="Detail Aset">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </a>
+                            {% if has_permission('edit_assets') %}
+                            <a href="{{ url_for('main.edit_asset', id=a.id) }}" class="icon-btn" title="Edit Aset">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="m14.5 7.5 3 3"/></svg>
+                            </a>
+                            {% endif %}
+                            {% if has_permission('print_reports') %}
+                            <a href="{{ url_for('main.print_label', asset_id=a.id) }}" target="_blank" class="icon-btn" title="Cetak QR Label">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                            </a>
+                            {% endif %}
+                            {% if has_permission('edit_assets') %}
+                            <a href="{{ url_for('main.delete_asset', id=a.id) }}" class="icon-btn danger" title="Hapus Aset" onclick="return confirm('Apakah Anda yakin ingin menghapus aset ini?')">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 48px; color: var(--slate-400);">
+                        <div style="font-size: 32px; margin-bottom: 8px;">🔍</div>
+                        <strong style="display: block; font-size: 15px; color: var(--slate-700); margin-bottom: 4px;">Tidak ada data aset ditemukan</strong>
+                        <p style="margin: 0; font-size: 13px;">Coba ubah kata kunci pencarian atau reset filter yang sedang aktif.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleFilters() {
+    const sec = document.getElementById('filterSection');
+    if (sec.style.display === 'none' || sec.style.display === '') {
+        sec.style.display = 'block';
+    } else {
+        sec.style.display = 'none';
+    }
+}
+
+function updateSelectionState() {
+    const cbs = document.querySelectorAll('.asset-select-cb:checked');
+    const bar = document.getElementById('selectionBar');
+    const text = document.getElementById('selectedCountText');
+    const allCb = document.getElementById('selectAllCheckbox');
+
+    if (cbs.length > 0) {
+        bar.style.display = 'flex';
+        text.innerText = `${cbs.length} aset dipilih untuk aksi massal`;
+    } else {
+        bar.style.display = 'none';
+    }
+
+    const allCheckboxes = document.querySelectorAll('.asset-select-cb');
+    if (allCheckboxes.length > 0) {
+        allCb.checked = (cbs.length === allCheckboxes.length);
+    }
+}
+
+function toggleSelectAll(master) {
+    const allCheckboxes = document.querySelectorAll('.asset-select-cb');
+    allCheckboxes.forEach(cb => {
+        cb.checked = master.checked;
+    });
+    updateSelectionState();
+}
+
+function clearSelection() {
+    document.querySelectorAll('.asset-select-cb').forEach(cb => cb.checked = false);
+    const allCb = document.getElementById('selectAllCheckbox');
+    if (allCb) allCb.checked = false;
+    updateSelectionState();
+}
+
+function printSelectedQR() {
+    const cbs = document.querySelectorAll('.asset-select-cb:checked');
+    if (cbs.length === 0) return;
+    const ids = Array.from(cbs).map(cb => cb.value).join(',');
+    window.open(`{{ url_for('main.print_all_labels') }}?selected_ids=${ids}`, '_blank');
+}
+</script>
+{% endblock %}

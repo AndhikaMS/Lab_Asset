@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Kelola Pengguna & Hak Akses · Lab Asset Management{% endblock %}
+
+{% block content %}
+<!-- Page Heading -->
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="8" r="4"/><path d="M4 21c.7-5 3.4-7 8-7s7.3 2 8 7"/></svg>
+            Administrasi &amp; Akses
+        </span>
+        <h1>Manajemen Pengguna &amp; Hak Akses</h1>
+        <p>Kelola akun pengguna, penetapan peran struktural (Role), serta konfigurasi izin modul granular.</p>
+    </div>
+    <div class="heading-actions">
+        {% if has_permission('manage_users') %}
+        <a href="{{ url_for('main.add_user') }}" class="btn btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            + Tambah Pengguna Baru
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Users Table Container -->
+<div class="table-container">
+    <div class="table-scroll">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th style="width: 60px; text-align: center;">No</th>
+                    <th>Pengguna &amp; Profil</th>
+                    <th>Peran / Jabatan</th>
+                    <th>Hak Akses Granular (Permissions)</th>
+                    <th style="text-align: right; width: 140px;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for idx, u in enumerate(users, start=1) %}
+                {% set perms = u.get_permissions_list() %}
+                {% set is_full_admin = (u.role in ['admin', 'Super Admin'] or 'all' in perms or perms|length == all_permissions|length) %}
+                <tr>
+                    <td style="text-align: center; font-weight: 700; color: var(--slate-400);">
+                        {{ "%02d"|format(idx) }}
+                    </td>
+                    <td>
+                        <div class="asset-identity">
+                            <div class="user-avatar-circle" style="width: 38px; height: 38px; font-size: 14px; background: {% if is_full_admin %}#ede9fe; color: #6366f1; border: 1.5px solid #c7d2fe;{% else %}var(--slate-100); color: var(--slate-700);{% endif %}">
+                                {{ (u.nama_lengkap or u.username or 'U')[0] | upper }}
+                            </div>
+                            <div class="asset-identity-text">
+                                <strong style="font-size: 14px; color: var(--slate-900);">{{ u.nama_lengkap or u.username }}</strong>
+                                <small style="font-family: var(--font-mono); color: var(--slate-500);">@{{ u.username }}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if is_full_admin %}
+                        <span class="badge" style="background: #ede9fe; color: #4338ca; border: 1px solid #c7d2fe; font-weight: 700; margin-bottom: 4px;">
+                            👑 {{ u.role if u.role != 'admin' else 'Super Admin' }}
+                        </span>
+                        {% elif u.role == 'Kepala Lab' %}
+                        <span class="badge badge-info" style="margin-bottom: 4px;">
+                            🔬 {{ u.role }}
+                        </span>
+                        {% elif u.role == 'Asisten Lab' %}
+                        <span class="badge badge-warning" style="margin-bottom: 4px;">
+                            🛠️ {{ u.role }}
+                        </span>
+                        {% elif u.role in ['Dekan', 'Rektor', 'Ketua Yayasan'] %}
+                        <span class="badge badge-cyan" style="margin-bottom: 4px;">
+                            🎓 {{ u.role }}
+                        </span>
+                        {% else %}
+                        <span class="badge badge-neutral" style="margin-bottom: 4px;">
+                            ⚙️ {{ u.role or 'Custom' }}
+                        </span>
+                        {% endif %}
+
+                        {% if u.jabatan %}
+                        <small style="display: block; color: var(--slate-600); font-weight: 600; font-size: 11.5px;">
+                            {{ u.jabatan }}
+                        </small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display: flex; flex-direction: column; gap: 6px; max-width: 520px;">
+                            {% if is_full_admin %}
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="badge badge-success" style="font-weight: 700; padding: 4px 10px;">
+                                    ✨ Akses Penuh (Seluruh 12 Modul Sistem)
+                                </span>
+                            </div>
+                            {% else %}
+                            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                                <span class="badge badge-primary" style="font-size: 11px; padding: 2px 8px; font-weight: 700;">
+                                    {{ perms|length }} dari {{ all_permissions|length }} Izin Aktif
+                                </span>
+                            </div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                {% for p in perms %}
+                                <span class="badge badge-neutral" style="font-size: 10.5px; padding: 2px 7px; font-family: var(--font-mono); background: var(--slate-100); color: var(--slate-700);" title="{{ all_permissions.get(p, p) }}">
+                                    ✓ {{ p }}
+                                </span>
+                                {% else %}
+                                <span style="font-size: 12px; color: var(--slate-400); font-style: italic;">
+                                    Belum ada hak akses khusus yang diberikan
+                                </span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 6px; align-items: center;">
+                            <a href="{{ url_for('main.edit_user', user_id=u.id) }}" class="icon-btn" title="Edit Hak Akses Pengguna">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="m14.5 7.5 3 3"/></svg>
+                            </a>
+                            {% if u.username != 'admin' and u.id != session.get('user_id') %}
+                            <form action="{{ url_for('main.delete_user', user_id=u.id) }}" method="POST" style="margin: 0;" onsubmit="return confirm('Apakah Anda yakin ingin menghapus akun {{ u.username }}?')">
+                                <button type="submit" class="icon-btn danger" title="Hapus Pengguna">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

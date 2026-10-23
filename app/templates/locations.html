@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Data Lokasi Laboratorium · Lab Asset Management{% endblock %}
+
+{% block content %}
+<!-- Page Heading -->
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Data Master &amp; Referensi
+        </span>
+        <h1>Data Lokasi Laboratorium</h1>
+        <p>Kelola ruangan laboratorium, kapasitas stasiun kerja, dan penomoran kode aset ruangan.</p>
+    </div>
+    <div class="heading-actions">
+        {% if has_permission('edit_master') %}
+        <button type="button" class="btn btn-primary" onclick="showAddForm()">
+            + Tambah Lokasi
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Unified Master Navigation Tabs (Matching Wireframe DataView) -->
+<div class="master-tabs" role="tablist">
+    <a href="{{ url_for('main.locations') }}" class="master-tab-btn active">
+        <strong>🏢 Data Lokasi</strong>
+        <span>{{ locations|length }} Ruangan Lab</span>
+    </a>
+    <a href="{{ url_for('main.categories') }}" class="master-tab-btn">
+        <strong>🏷️ Data Kategori</strong>
+        <span>Klasifikasi Barang</span>
+    </a>
+    <a href="{{ url_for('main.prodi') }}" class="master-tab-btn">
+        <strong>🎓 Program Studi</strong>
+        <span>Akademik Pengelola</span>
+    </a>
+    <a href="{{ url_for('main.kepala_lab') }}" class="master-tab-btn">
+        <strong>👤 Kepala Lab</strong>
+        <span>Pejabat &amp; Periode</span>
+    </a>
+</div>
+
+<!-- Inline Editor Panel (Matching Wireframe master-editor) -->
+{% if has_permission('edit_master') %}
+<div id="locationEditorPanel" class="panel" style="display: none; border-color: var(--primary-border); box-shadow: 0 4px 16px var(--primary-glow);">
+    <div class="panel-title" style="background: var(--primary-light); color: var(--primary);">
+        <span id="formTitle">Tambah Lokasi Baru</span>
+        <button type="button" onclick="cancelEdit()" class="icon-btn" style="width: 28px; height: 28px;">&times;</button>
+    </div>
+    <div class="panel-body">
+        <form id="locationForm" method="POST" action="{{ url_for('main.tambah_lokasi') }}">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                <label class="field">
+                    <span>Kode Lab (ID Unik) *</span>
+                    <input type="text" name="kode_lab" id="kode_lab" required placeholder="Contoh: LAB-01">
+                </label>
+                <label class="field">
+                    <span>Nama Laboratorium *</span>
+                    <input type="text" name="nama_lab" id="nama_lab" required placeholder="Contoh: Lab Komputer 1">
+                </label>
+                <label class="field">
+                    <span>Kode Aset (Digit Lokasi)</span>
+                    <input type="text" name="kode_aset" id="kode_aset" placeholder="Contoh: 1, 2, dll.">
+                </label>
+                <label class="field">
+                    <span>Kapasitas Stasiun (Unit) *</span>
+                    <input type="number" name="kapasitas" id="kapasitas" min="1" required placeholder="40">
+                </label>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-outline" onclick="cancelEdit()">Batal</button>
+                <button type="submit" id="btnSubmit" class="btn btn-primary">Simpan Lokasi</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- Locations Table Container -->
+<div class="table-container">
+    <div class="table-scroll">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th style="width: 140px;">Kode Lab</th>
+                    <th>Nama Laboratorium</th>
+                    <th>Kode Aset (Lokasi)</th>
+                    <th>Kapasitas</th>
+                    <th>Jumlah Aset Terhubung</th>
+                    {% if has_permission('edit_master') %}
+                    <th style="text-align: right; width: 140px;">Aksi</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for loc in locations %}
+                <tr>
+                    <td>
+                        <span class="badge badge-info" style="font-family: var(--font-mono); font-size: 12px;">
+                            {{ loc.kode_lab }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="asset-identity">
+                            <div class="asset-thumb">🏢</div>
+                            <div>
+                                <strong style="font-size: 14px; color: var(--slate-900);">{{ loc.nama_lab }}</strong>
+                                <small style="color: var(--slate-500);">Fasilitas Laboratorium</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span style="font-family: var(--font-mono); font-weight: 700; color: var(--slate-800);">
+                            {{ loc.kode_aset or '-' }}
+                        </span>
+                    </td>
+                    <td>
+                        <strong>{{ loc.kapasitas }}</strong> <small style="color: var(--slate-500);">Workstations</small>
+                    </td>
+                    <td>
+                        <span class="badge badge-neutral">
+                            {{ loc.assets|length }} Aset
+                        </span>
+                    </td>
+                    {% if has_permission('edit_master') %}
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 6px;">
+                            <button type="button" class="icon-btn" title="Edit Lokasi" onclick="editLocation({{ loc.id }}, '{{ loc.kode_lab }}', '{{ loc.nama_lab }}', '{{ loc.kode_aset or '' }}', {{ loc.kapasitas }})">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="m14.5 7.5 3 3"/></svg>
+                            </button>
+                            <a href="{{ url_for('main.delete_location', id=loc.id) }}" class="icon-btn danger" title="Hapus Lokasi" onclick="return confirm('Apakah Anda yakin ingin menghapus data lokasi ini?')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>
+                            </a>
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--slate-400);">Belum ada data lokasi laboratorium.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showAddForm() {
+    const p = document.getElementById('locationEditorPanel');
+    if (!p) return;
+    p.style.display = 'block';
+    document.getElementById('formTitle').innerText = 'Tambah Lokasi Baru';
+    document.getElementById('locationForm').action = "{{ url_for('main.tambah_lokasi') }}";
+    document.getElementById('kode_lab').value = '';
+    document.getElementById('nama_lab').value = '';
+    document.getElementById('kode_aset').value = '';
+    document.getElementById('kapasitas').value = '';
+    document.getElementById('btnSubmit').innerText = 'Simpan Lokasi';
+    p.scrollIntoView({ behavior: 'smooth' });
+}
+
+function editLocation(id, kode, nama, kodeAset, kapasitas) {
+    const p = document.getElementById('locationEditorPanel');
+    if (!p) return;
+    p.style.display = 'block';
+    document.getElementById('formTitle').innerText = 'Edit Lokasi: ' + nama;
+    document.getElementById('locationForm').action = '/locations/edit/' + id;
+    document.getElementById('kode_lab').value = kode;
+    document.getElementById('nama_lab').value = nama;
+    document.getElementById('kode_aset').value = kodeAset;
+    document.getElementById('kapasitas').value = kapasitas;
+    document.getElementById('btnSubmit').innerText = 'Simpan Perubahan';
+    p.scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelEdit() {
+    const p = document.getElementById('locationEditorPanel');
+    if (p) p.style.display = 'none';
+}
+</script>
+{% endblock %}

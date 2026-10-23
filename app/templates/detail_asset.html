@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+
+{% block title %}Detail Aset · {{ asset.nama_aset }}{% endblock %}
+
+{% block content %}
+<!-- Page Heading -->
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Record Detail Aset
+        </span>
+        <h1>{{ asset.nama_aset }}</h1>
+        <p>Kode Inventaris Resmi · <span style="font-family: var(--font-mono); font-weight: 700; color: var(--slate-900);">{{ asset.kode_aset }}</span></p>
+    </div>
+    <div class="heading-actions">
+        <a href="{{ url_for('main.assets') }}" class="btn btn-outline">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+            Kembali
+        </a>
+        {% if has_permission('print_reports') %}
+        <a href="{{ url_for('main.print_label', asset_id=asset.id) }}" target="_blank" class="btn btn-cyan">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Cetak Label QR
+        </a>
+        {% endif %}
+        {% if has_permission('edit_assets') %}
+        <a href="{{ url_for('main.edit_asset', id=asset.id) }}" class="btn btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="m14.5 7.5 3 3"/></svg>
+            Edit Aset
+        </a>
+        <a href="{{ url_for('main.delete_asset', id=asset.id) }}" class="btn btn-danger" onclick="return confirm('Peringatan: Apakah Anda yakin ingin menghapus aset ini beserta data histori servisnya?')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>
+            Hapus
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 2-Column Detail Viewport (Matching Wireframe Redesign) -->
+<div class="detail-grid">
+    <!-- Left Column: Core Data, Media, Economics -->
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+        <!-- Panel 1: Data Identitas & Kode -->
+        <section class="panel">
+            <div class="panel-title">
+                <span>Struktur Kode Penomoran</span>
+                <span class="code-badge">27-Digit Standar</span>
+            </div>
+            <div class="panel-body">
+                <dl class="data-list">
+                    <div class="data-row">
+                        <dt>Kode Lokasi (12 Digit)</dt>
+                        <dd style="font-family: var(--font-mono); color: var(--primary);">
+                            {{ asset.kode_lokasi.yayasan if asset.kode_lokasi else '1001' }}
+                            {{ asset.kode_lokasi.rektorat if asset.kode_lokasi else '01' }}
+                            {{ asset.kode_lokasi.fakultas if asset.kode_lokasi else '02' }}
+                            {{ asset.kode_lokasi.prodi.kode_aset if asset.kode_lokasi and asset.kode_lokasi.prodi else '03' }}
+                            {{ asset.kode_lokasi.ruangan if asset.kode_lokasi else '01' }}
+                        </dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Kode Barang (15 Digit)</dt>
+                        <dd style="font-family: var(--font-mono); color: var(--primary);">
+                            {{ asset.kode_barang.golongan if asset.kode_barang else '01' }}
+                            {{ asset.kode_barang.bidang if asset.kode_barang else '02' }}
+                            {{ asset.kode_barang.kelompok if asset.kode_barang else '03' }}
+                            {{ asset.kode_barang.subkelompok if asset.kode_barang else '04' }}
+                            {{ asset.kode_barang.tahun_pengadaan if asset.kode_barang else '2023' }}
+                            {{ asset.kode_barang.urutan_ruangan_id if asset.kode_barang else '1' }}
+                            {{ asset.kode_barang.nomor_urut if asset.kode_barang else '01' }}
+                        </dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Format Label Inventaris</dt>
+                        <dd style="font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--primary);">
+                            {{ asset.format_label() }}
+                        </dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Nomor Inventaris (Blok Mentah)</dt>
+                        <dd style="font-family: var(--font-mono); font-size: 13px; color: var(--slate-700);">
+                            {{ asset.kode_aset }}
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        </section>
+
+        <!-- Panel 2: Media Grid (Foto Fisik & QR Code Resmi) -->
+        <section class="panel">
+            <div class="panel-title">
+                <span>Dokumentasi Fisik &amp; Label QR</span>
+            </div>
+            <div class="panel-body">
+                <div class="media-side-by-side">
+                    <!-- Foto Fisik Barang -->
+                    <div class="media-card">
+                        <div style="width: 100%; height: 180px; display: flex; align-items: center; justify-content: center; background: var(--white); border-radius: var(--radius-sm); overflow: hidden;">
+                            {% if asset.foto_path %}
+                            <a href="{{ url_for('static', filename=asset.foto_path) }}" target="_blank" title="Klik untuk memperbesar gambar">
+                                <img src="{{ url_for('static', filename=asset.foto_path) }}" alt="{{ asset.nama_aset }}" style="max-height: 180px; width: 100%; object-fit: cover;">
+                            </a>
+                            {% else %}
+                            <div style="color: var(--slate-400); text-align: center; padding: 20px;">
+                                <div style="font-size: 32px; margin-bottom: 6px;">📷</div>
+                                <span style="font-size: 12px; font-weight: 600;">Belum ada foto fisik</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <h4>Foto Fisik Barang</h4>
+                        <span style="font-size: 11px; color: var(--slate-500);">Dokumentasi identifikasi unit</span>
+                    </div>
+
+                    <!-- QR Code Resmi -->
+                    <div class="media-card">
+                        <div style="width: 100%; height: 180px; display: flex; align-items: center; justify-content: center; background: var(--white); border-radius: var(--radius-sm);">
+                            {% if asset.qr_code_path %}
+                            <img src="{{ url_for('static', filename=asset.qr_code_path) }}" alt="QR Code {{ asset.kode_aset }}" style="width: 140px; height: 140px; padding: 6px; border: 1px solid var(--slate-200); border-radius: 8px;">
+                            {% else %}
+                            <div style="color: var(--slate-400); text-align: center;">
+                                <div style="font-size: 32px; margin-bottom: 6px;">📱</div>
+                                <span style="font-size: 12px; font-weight: 600;">QR belum dibuat</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <h4>QR Code Inventaris</h4>
+                        {% if asset.qr_code_path %}
+                        <div style="display: flex; gap: 8px; margin-top: 6px;">
+                            <a href="{{ url_for('static', filename=asset.qr_code_path) }}" download="QR_{{ asset.kode_aset }}.png" class="btn btn-outline btn-sm">
+                                Unduh PNG
+                            </a>
+                            <a href="{{ url_for('main.print_label', asset_id=asset.id) }}" target="_blank" class="btn btn-cyan btn-sm">
+                                Cetak
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Panel 3: Rincian Spesifikasi Aset -->
+        <section class="panel">
+            <div class="panel-title">
+                <span>Rincian Spesifikasi &amp; Lokasi</span>
+            </div>
+            <div class="panel-body">
+                <dl class="data-list">
+                    <div class="data-row">
+                        <dt>Nama Aset</dt>
+                        <dd>{{ asset.nama_aset }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Kategori Barang</dt>
+                        <dd>{{ asset.category.nama_kategori if asset.category else '-' }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Ruangan Laboratorium</dt>
+                        <dd>{{ asset.location.nama_lab if asset.location else '-' }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Program Studi Pengelola</dt>
+                        <dd>{{ asset.prodi.nama_prodi if asset.prodi else '-' }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Tahun Pengadaan</dt>
+                        <dd>Tahun {{ asset.tahun_pengadaan or '-' }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Kondisi Fisik Saat Ini</dt>
+                        <dd>
+                            <span class="badge {% if asset.kondisi == 'Baik' %}badge-success{% elif asset.kondisi == 'Rusak Berat' %}badge-danger{% else %}badge-warning{% endif %}">
+                                {{ asset.kondisi or 'Baik' }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="data-row" style="align-items: flex-start;">
+                        <dt>Deskripsi &amp; Spesifikasi</dt>
+                        <dd style="max-width: 60%; text-align: right; line-height: 1.5; font-weight: 500; color: var(--slate-700);">
+                            {{ asset.deskripsi or 'Tidak ada deskripsi spesifikasi tambahan.' }}
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        </section>
+
+        <!-- Panel 4: Data Ekonomis & Depresiasi (Straight Line) -->
+        <section class="panel">
+            <div class="panel-title">
+                <span>Data Finansial &amp; Depresiasi (Straight Line)</span>
+            </div>
+            <div class="panel-body">
+                <dl class="data-list">
+                    <div class="data-row">
+                        <dt>Harga Perolehan Awal</dt>
+                        <dd>Rp {{ "{:,.0f}".format(asset.harga_perolehan or 0).replace(',', '.') }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Masa Manfaat / Umur Ekonomis</dt>
+                        <dd>{{ asset.umur_ekonomis or 0 }} Tahun</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Estimasi Nilai Residu</dt>
+                        <dd>Rp {{ "{:,.0f}".format(asset.nilai_residu or 0).replace(',', '.') }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Beban Penyusutan per Tahun</dt>
+                        <dd style="color: var(--amber-600);">Rp {{ "{:,.0f}".format(asset.penyusutan_per_tahun()).replace(',', '.') }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Nilai Buku Saat Ini (Net Book Value)</dt>
+                        <dd style="font-size: 16px; color: var(--emerald-600);">
+                            Rp {{ "{:,.0f}".format(asset.nilai_buku()).replace(',', '.') }}
+                        </dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Sisa Umur Ekonomis</dt>
+                        <dd>
+                            {% set sisa = asset.sisa_umur_ekonomis() %}
+                            <span class="badge {% if sisa == 0 %}badge-danger{% elif sisa <= 2 %}badge-warning{% else %}badge-success{% endif %}">
+                                {{ sisa }} Tahun Tersisa
+                            </span>
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        </section>
+
+        <!-- Panel 5: Parameter Kriteria Penilaian Kelayakan -->
+        <section class="panel">
+            <div class="panel-title">
+                <span>Parameter Kriteria Penilaian Kelayakan</span>
+            </div>
+            <div class="panel-body">
+                <dl class="data-list">
+                    <div class="data-row">
+                        <dt>C1 · Sisa Umur Ekonomis (Cost)</dt>
+                        <dd><strong>{{ asset.sisa_umur_ekonomis() }}</strong> Tahun</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>C2 · Skor Tingkat Kerusakan (Benefit)</dt>
+                        <dd>
+                            <span class="badge {% if (asset.skor_kerusakan or 1) >= 3 %}badge-danger{% elif (asset.skor_kerusakan or 1) == 2 %}badge-warning{% else %}badge-success{% endif %}">
+                                Skor {{ asset.skor_kerusakan or 1 }} / 3 ({{ asset.kondisi or 'Baik' }})
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>C3 · Biaya Perawatan Historis (Benefit)</dt>
+                        <dd style="color: var(--primary);">Rp {{ "{:,.0f}".format(asset.biaya_perawatan or 0).replace(',', '.') }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </section>
+    </div>
+
+    <!-- Right Column: Maintenance History Panel (Matching Wireframe HistoryPanel) -->
+    <div>
+        <section class="panel" style="position: sticky; top: 88px;">
+            <div class="panel-title">
+                <span>Riwayat Servis &amp; Perbaikan</span>
+                <span class="badge badge-neutral">{{ asset.perbaikan_list|length }} Catatan</span>
+            </div>
+            <div class="panel-body">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--slate-100);">
+                    <div>
+                        <span style="font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase;">Akumulasi Biaya</span>
+                        <div style="font-size: 18px; font-weight: 800; color: var(--emerald-600);">
+                            Rp {{ "{:,.0f}".format(asset.biaya_perawatan or 0).replace(',', '.') }}
+                        </div>
+                    </div>
+                    {% if has_permission('manage_perbaikan') %}
+                    <a href="{{ url_for('main.tambah_perbaikan') }}?asset_id={{ asset.id }}" class="btn btn-dark btn-sm">
+                        + Tambah Riwayat
+                    </a>
+                    {% endif %}
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 12px; max-height: 520px; overflow-y: auto; padding-right: 4px;">
+                    {% for p in asset.perbaikan_list %}
+                    <article class="history-card">
+                        <div class="history-card-header">
+                            <span class="history-date">📅 {{ p.tanggal_perbaikan.strftime('%d %b %Y') }}</span>
+                            <span class="history-cost">Rp {{ "{:,.0f}".format(p.biaya_perbaikan).replace(',', '.') }}</span>
+                        </div>
+                        <p style="margin: 0 0 10px; font-size: 13px; color: var(--slate-700); line-height: 1.4;">
+                            {{ p.deskripsi }}
+                        </p>
+                        {% if has_permission('manage_perbaikan') %}
+                        <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                            <a href="{{ url_for('main.edit_perbaikan', id=p.id) }}" class="icon-btn" style="width: 28px; height: 28px;" title="Edit Perbaikan">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="m14.5 7.5 3 3"/></svg>
+                            </a>
+                            <a href="{{ url_for('main.hapus_perbaikan', id=p.id) }}" class="icon-btn danger" style="width: 28px; height: 28px;" title="Hapus Perbaikan" onclick="return confirm('Hapus catatan perbaikan ini?')">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>
+                            </a>
+                        </div>
+                        {% endif %}
+                    </article>
+                    {% else %}
+                    <div style="text-align: center; padding: 40px 16px; background: var(--slate-50); border: 1.5px dashed var(--slate-200); border-radius: var(--radius-md); color: var(--slate-400);">
+                        <div style="font-size: 28px; margin-bottom: 6px;">🛠️</div>
+                        <strong style="display: block; font-size: 13px; color: var(--slate-700);">Belum Ada Riwayat Perbaikan</strong>
+                        <p style="margin: 0; font-size: 12px;">Aset ini belum pernah mencatat biaya servis atau penggantian suku cadang.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}

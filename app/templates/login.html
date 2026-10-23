@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Masuk Sistem · Lab Asset Management Workspace{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: center; align-items: center; min-height: 75vh; padding: 20px;">
+    <div
+        style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(16px); padding: 44px 38px; border-radius: var(--radius-xl); box-shadow: var(--shadow-xl); border: 1px solid var(--slate-200); width: 100%; max-width: 420px; text-align: center;">
+
+        <!-- Brand Icon Badge -->
+        <div
+            style="width: 54px; height: 54px; margin: 0 auto 16px; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--slate-950), var(--slate-900)); color: #818cf8; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15);">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z" />
+                <path d="m4.5 7.8 7.5 4.3 7.5-4.3M12 12v9" />
+            </svg>
+        </div>
+
+        <h2
+            style="margin: 0 0 24px; color: var(--slate-900); font-weight: 800; font-size: 24px; letter-spacing: -0.02em;">
+            Login</h2>
+
+        <form method="POST" style="text-align: left;">
+            <div style="margin-bottom: 18px;">
+                <label class="field">
+                    <span>Username Akun</span>
+                    <input type="text" name="username" required autofocus placeholder="Masukkan username..."
+                        style="padding: 11px 14px;">
+                </label>
+            </div>
+            <div style="margin-bottom: 24px;">
+                <label class="field">
+                    <span>Kata Sandi (Password)</span>
+                    <input type="password" name="password" required placeholder="••••••••" style="padding: 11px 14px;">
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary"
+                style="width: 100%; padding: 12px; font-size: 14px; font-weight: 700; box-shadow: 0 4px 14px var(--primary-glow);">
+                Masuk ke Sistem →
+            </button>
+        </form>
+
+
+    </div>
+</div>
+{% endblock %}

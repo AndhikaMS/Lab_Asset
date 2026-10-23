@@ -1,0 +1,1513 @@
+{% extends "base.html" %}
+
+{% block title %}Layout Designer & Pemetaan 2D · {{ current_location.nama_lab if current_location else 'Laboratorium' }}{% endblock %}
+
+{% block content %}
+<!-- Page Heading -->
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9M15 21V9"/></svg>
+            Desain Tata Letak &amp; Pemetaan Denah 2D
+        </span>
+        <h1 id="pageHeadingTitle">{{ current_location.nama_lab if current_location else 'Laboratorium Komputer' }}</h1>
+        <p>Desain arsitektur ruangan mandiri dan pemetaan spasial unit komputer tanpa ketergantungan berkas gambar statis.</p>
+    </div>
+    
+    <div class="heading-actions">
+        <!-- Switch Lab Selector -->
+        <form method="GET" action="{{ url_for('main.floor_plan') }}" style="display: flex; gap: 8px;">
+            <select name="location_id" onchange="this.form.submit()" style="font-weight: 700; padding: 8px 14px; font-size: 13px; border-radius: var(--radius-md); border: 1px solid var(--slate-300);">
+                {% for loc in locations %}
+                <option value="{{ loc.id }}" {% if current_location and current_location.id == loc.id %}selected{% endif %}>
+                    🏢 {{ loc.nama_lab }} ({{ loc.assets|length }} aset)
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+
+        <span class="badge badge-neutral" style="padding: 7px 12px; font-size: 12px;">
+            📦 Total: {{ total_assets }} Aset
+        </span>
+        <span class="badge badge-success" style="padding: 7px 12px; font-size: 12px;">
+            🟢 {{ baik_count }} Normal
+        </span>
+        {% if maint_count > 0 %}
+        <span class="badge badge-warning" style="padding: 7px 12px; font-size: 12px;">
+            🟡 {{ maint_count }} Servis
+        </span>
+        {% endif %}
+        {% if rusak_berat_count > 0 %}
+        <span class="badge badge-danger" style="padding: 7px 12px; font-size: 12px;">
+            🔴 {{ rusak_berat_count }} Rusak
+        </span>
+        {% endif %}
+
+        {% if has_permission('edit_assets') %}
+            {% if current_location and current_location.denah_image %}
+            <form method="POST" action="{{ url_for('main.remove_floor_plan_image') }}" style="display: inline;" onsubmit="return confirm('Hapus gambar denah latar belakang yang tersimpan?');">
+                <input type="hidden" name="location_id" value="{{ current_location.id }}">
+                <button type="submit" class="btn btn-danger btn-sm" title="Hapus gambar denah latar belakang yang tersimpan" style="font-weight: 700;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    Hapus Latar Belakang
+                </button>
+            </form>
+            {% else %}
+            <button type="button" class="btn btn-outline" onclick="openUploadDenahModal()" title="Opsi sekunder: Tambah layer gambar denah eksternal sebagai referensi tracing opsional">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Latar Gambar (Opsional)
+            </button>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+
+<!-- Interactive Toolbar: Realtime Search, Filters, & Mode Switch -->
+<div class="floor-toolbar">
+    <!-- Real-time Spasial Search Bar -->
+    <div class="floor-search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="floorSearchInput" placeholder="Ketik nomor PC, nama aset, atau spek (mis: PC-05, Core i7)..." oninput="handleFloorSearch(this.value)">
+    </div>
+
+    <!-- Condition Filter Pills -->
+    <div class="floor-filter-pills">
+        <button type="button" class="floor-pill active" onclick="setFloorFilter('all', this)">Semua (<span id="totalPlacedPill">{{ placed_count }}</span>)</button>
+        <button type="button" class="floor-pill" onclick="setFloorFilter('green', this)">🟢 Normal</button>
+        <button type="button" class="floor-pill" onclick="setFloorFilter('amber', this)">🟡 Servis</button>
+        <button type="button" class="floor-pill" onclick="setFloorFilter('red', this)">🔴 Rusak</button>
+    </div>
+
+    <!-- Edit Mode Toggle -->
+    {% if has_permission('edit_assets') %}
+    <div style="display: flex; gap: 8px;">
+        <button type="button" id="toggleDesignerBtn" class="btn btn-dark" onclick="toggleDesignerMode()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="14 2 18 6 7 17 3 17 3 13 14 2"/></svg>
+            <span id="toggleDesignerText">Mode Desain Layout</span>
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Main 2D Floor Layout Grid -->
+<div class="floor-layout">
+    <!-- Left: Canvas Viewport & Shapes Toolbar -->
+    <div class="designer-stage-card">
+        <!-- In-App Designer Tools Bar (Active in Edit Mode) -->
+        <div id="designerToolsPanel" class="designer-tools-panel" style="display: none;">
+            <div class="designer-shapes-group">
+                <span style="font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 6px; letter-spacing: 0.05em;">Bentuk:</span>
+                <button type="button" class="tool-shape-btn" onclick="addShape('line')" title="Tambah Garis (Bisa diatur panjang & tebal)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"/></svg>
+                    <span>Garis</span>
+                </button>
+                <button type="button" class="tool-shape-btn" onclick="addShape('rectangle')" title="Tambah Persegi / Kotak">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+                    <span>Persegi</span>
+                </button>
+                <button type="button" class="tool-shape-btn" onclick="addShape('oval')" title="Tambah Oval / Lingkaran">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="9" ry="7"/></svg>
+                    <span>Oval</span>
+                </button>
+                <button type="button" class="tool-shape-btn" onclick="addShape('triangle')" title="Tambah Segitiga">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,3 22,21 2,21"/></svg>
+                    <span>Segitiga</span>
+                </button>
+            </div>
+
+            <!-- Presets and Save Buttons -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 700; color: #cbd5e1; cursor: pointer;">
+                    <input type="checkbox" id="snapGridCb" checked style="accent-color: var(--primary);"> Ratakan ke Grid
+                </label>
+                {% if current_location and current_location.denah_image %}
+                <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 700; color: #cbd5e1; cursor: pointer;" title="Tampilkan/sembunyikan layer gambar latar">
+                    <input type="checkbox" id="toggleBgWatermarkCb" checked onchange="const el = document.getElementById('optionalBgWatermark'); if (el) el.style.display = this.checked ? 'block' : 'none';">
+                    Latar Gambar
+                </label>
+                {% endif %}
+                <button type="button" class="btn btn-outline btn-sm" style="color: white; border-color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.08);" onclick="applyTemplate20()">
+                    ⚡ Template 20 PC
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="clearCanvasLayout()" title="Kosongkan denah untuk mulai menggambar bebas dari nol">
+                    Bersihkan (Kanvas Kosong)
+                </button>
+                <button type="button" id="saveLayoutBtn" class="btn btn-primary btn-sm" onclick="saveInAppLayout()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Simpan Layout
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas Header Status -->
+        <div class="floor-canvas-header">
+            <div>
+                <strong style="color: var(--slate-900);">Ruangan: {{ current_location.nama_lab if current_location else 'Lab' }}</strong>
+                <span id="canvasModeLabel" style="margin-left: 8px; color: var(--slate-500); font-size: 12px;">(Mode Pantau · Klik meja komputer atau titik marker untuk melihat spesifikasi)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="badge badge-neutral" id="placedCounterBadge">{{ placed_count }} Aset Terpasang</span>
+                <span class="badge badge-success" style="font-size: 11px;">In-App Designer</span>
+            </div>
+        </div>
+
+        <!-- The Responsive In-App Canvas Stage -->
+        <div class="inapp-canvas-container" id="inappCanvasStage">
+            <!-- Canvas Empty State Guide (Visible when canvas is empty) -->
+            <div id="canvasEmptyState" style="display: none; position: absolute; inset: 0; flex-direction: column; align-items: center; justify-content: center; color: #64748b; pointer-events: none; text-align: center; padding: 24px; z-index: 5;">
+                <div style="font-size: 36px; margin-bottom: 10px; opacity: 0.7;">📐</div>
+                <strong style="font-size: 15px; color: #cbd5e1; margin-bottom: 6px;">Kanvas Denah Masih Kosong</strong>
+                <span style="font-size: 12.5px; max-width: 460px; line-height: 1.5; color: #94a3b8;">
+                    Gunakan <strong>Mode Desain Layout</strong> di atas untuk menggambar bentuk ruangan (kotak, garis dinding, pintu), atau klik <strong>"+ Pasang"</strong> pada panel kanan untuk menempatkan aset sebagai <em>Kotak Shape</em> atau <em>Titik Marker</em>.
+                </span>
+            </div>
+
+            <!-- Optional Background Watermark (If uploaded) -->
+            {% if current_location and current_location.denah_image %}
+            <div id="optionalBgWatermark" style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.25; background-image: url('{{ url_for('static', filename='uploads/floor_plans/' + current_location.denah_image) }}'); background-size: contain; background-position: center; background-repeat: no-repeat; pointer-events: none; z-index: 1;"></div>
+            {% endif %}
+
+            <!-- Room Boundary Walls -->
+            <div class="room-perimeter-boundary"></div>
+
+            <!-- Dynamic Room Title Header -->
+            <div class="room-title-header" id="roomTitleHeader">
+                {{ current_location.nama_lab.upper() if current_location else 'LABORATORIUM' }}
+            </div>
+
+            <!-- Fixtures Layer (Freeform Shapes: Dinding, Meja Bebas, Proyektor, AC, dll) -->
+            <div id="fixturesContainer">
+                <!-- Injected via JavaScript -->
+            </div>
+
+            <!-- Workstations Layer (Placed Assets: Shape or Dot) -->
+            <div id="workstationsContainer">
+                <!-- Injected via JavaScript -->
+            </div>
+        </div>
+
+        <!-- Canvas Footer Legend -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--slate-50); border-top: 1px solid var(--slate-200); font-size: 12px; color: var(--slate-600); flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 18px;">
+                <span style="display: flex; align-items: center; gap: 6px;"><i class="dot green" style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block;"></i> Normal (Baik)</span>
+                <span style="display: flex; align-items: center; gap: 6px;"><i class="dot amber" style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; display: inline-block;"></i> Servis / Maintenance</span>
+                <span style="display: flex; align-items: center; gap: 6px;"><i class="dot red" style="width: 8px; height: 8px; border-radius: 50%; background: #f43f5e; display: inline-block;"></i> Rusak Berat</span>
+                <span style="display: flex; align-items: center; gap: 6px;"><i style="width: 10px; height: 10px; border-radius: 2px; border: 1.5px solid #64748b; background: rgba(30,41,59,0.7); display: inline-block;"></i> Shape Bebas</span>
+            </div>
+            <div style="color: var(--slate-500); font-size: 11.5px;">
+                💡 <em>Tip: Klik "+ Pasang" pada aset untuk memilih representasi Kotak Meja atau Titik Marker.</em>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Element Inspector & Unplaced Drawer -->
+    <div class="unplaced-panel">
+        <!-- Element Inspector (When clicking a workstation or fixture in Edit Mode) -->
+        <div id="elementInspectorCard" style="display: none; padding: 16px; background: #0f172a; color: white; border-bottom: 2px solid var(--primary); animation: fadeIn 0.15s ease;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span id="inspectorTypeBadge" class="badge badge-primary" style="font-size: 10px; text-transform: uppercase;">Aset Terikat</span>
+                    <strong id="inspectorCardTitle" style="font-size: 13px; color: #f8fafc;">Inspector Elemen</strong>
+                </div>
+                <button type="button" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 15px;" onclick="closeInspector()">✕</button>
+            </div>
+
+            <!-- Body for Placed Asset -->
+            <div id="inspectorAssetSection" style="display: flex; flex-direction: column; gap: 11px;">
+                <div style="padding: 8px 10px; background: #1e293b; border-radius: 6px; border: 1px solid #334155;">
+                    <span style="font-size: 10px; color: #94a3b8; display: block;">Aset Terikat:</span>
+                    <strong id="inspectorAssetName" style="font-size: 12.5px; color: #ffffff; display: block;">-</strong>
+                    <span id="inspectorAssetCode" style="font-size: 11px; color: #a5b4fc; font-family: var(--font-mono); display: block; margin-top: 2px;">-</span>
+                </div>
+
+                <!-- Toggle Representation: Shape vs Dot -->
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 5px;">Bentuk Representasi di Denah:</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                        <button type="button" id="btnRepShape" class="rep-toggle-btn active" onclick="switchSelectedRepresentation('shape')">
+                            <span style="font-size: 12px;">⬛</span> Bentuk Shape
+                        </button>
+                        <button type="button" id="btnRepDot" class="rep-toggle-btn" onclick="switchSelectedRepresentation('dot')">
+                            <span style="font-size: 13px;">📍</span> Bentuk Titik
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">Label di Denah:</label>
+                    <input type="text" id="inspectorLabelInput" style="width: 100%; padding: 6px 10px; font-size: 12px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: white;" oninput="updateSelectedLabel(this.value)">
+                </div>
+
+                <div id="inspectorDimsRow" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div>
+                        <label style="font-size: 10.5px; color: #94a3b8; display: block; margin-bottom: 2px;">Lebar (%):</label>
+                        <input type="number" id="inspectorWidthInput" min="2" max="95" step="0.5" style="width: 100%; padding: 5px 8px; font-size: 12px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: white;" oninput="updateSelectedDim('w', this.value)">
+                    </div>
+                    <div>
+                        <label style="font-size: 10.5px; color: #94a3b8; display: block; margin-bottom: 2px;">Tinggi (%):</label>
+                        <input type="number" id="inspectorHeightInput" min="2" max="95" step="0.5" style="width: 100%; padding: 5px 8px; font-size: 12px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: white;" oninput="updateSelectedDim('h', this.value)">
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-danger btn-sm" style="font-size: 11px; margin-top: 4px;" onclick="unbindSelectedAsset()">
+                    Lepas Aset (Kembalikan ke Belum Terpasang)
+                </button>
+            </div>
+
+            <!-- Body for Freeform Fixture -->
+            <div id="inspectorFixtureSection" style="display: none; flex-direction: column; gap: 11px;">
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">Teks / Label Objek:</label>
+                    <input type="text" id="inspectorFixLabelInput" style="width: 100%; padding: 6px 10px; font-size: 12px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: white;" oninput="updateSelectedFixtureLabel(this.value)">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div>
+                        <label style="font-size: 10.5px; color: #94a3b8; display: block; margin-bottom: 2px;">Lebar (%):</label>
+                        <input type="number" id="inspectorFixWidthInput" min="1" max="95" step="0.5" style="width: 100%; padding: 5px 8px; font-size: 12px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: white;" oninput="updateSelectedFixtureDim('w', this.value)">
+                    </div>
+                    <div>
+                        <label style="font-size: 10.5px; color: #94a3b8; display: block; margin-bottom: 2px;">Tinggi (%):</label>
+                        <input type="number" id="inspectorFixHeightInput" min="1" max="95" step="0.5" style="width: 100%; padding: 5px 8px; font-size: 12px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: white;" oninput="updateSelectedFixtureDim('h', this.value)">
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-danger btn-sm" style="font-size: 11px; margin-top: 4px;" onclick="deleteSelectedFixtureFromInspector()">
+                    Hapus Objek Bebas Ini
+                </button>
+            </div>
+        </div>
+
+        <div class="unplaced-header">
+            <div>
+                <strong style="font-size: 13.5px; color: var(--slate-900);">Aset Lab Belum Terpasang</strong>
+                <span style="display: block; font-size: 11.5px; color: var(--slate-500);">Klik "+ Pasang" untuk menempatkan</span>
+            </div>
+            <span class="badge badge-neutral" id="unplacedCounterBadge">{{ unplaced_count }} Unit</span>
+        </div>
+
+        <!-- Quick Search inside unplaced drawer -->
+        <div style="padding: 8px 14px; border-bottom: 1px solid var(--slate-200); background: var(--slate-50);">
+            <input type="text" id="unplacedSearchInput" placeholder="Cari nama aset di daftar ini..." style="width: 100%; padding: 6px 10px; font-size: 12px; border: 1px solid var(--slate-300); border-radius: 6px;" oninput="renderUnplacedList()">
+        </div>
+
+        <div class="unplaced-body" id="unplacedListContainer">
+            <!-- Injected via JavaScript -->
+        </div>
+
+        <div style="padding: 12px 16px; border-top: 1px solid var(--slate-200); background: var(--slate-50); font-size: 11.5px; color: var(--slate-500); line-height: 1.4;">
+            Klik <strong>"+ Pasang"</strong> pada aset untuk memilih representasi <strong>Bentuk Shape (Kotak)</strong> atau <strong>Bentuk Titik (Marker)</strong>.
+        </div>
+    </div>
+</div>
+
+<!-- Modal Pilih Representasi Aset (Shape vs Titik) -->
+<div id="placeAssetModal" class="modal-backdrop" style="display: none;" onclick="if(event.target === this) closePlaceAssetModal()">
+    <div class="modal-card modal-content" style="background: #ffffff !important; border-radius: 16px; width: 100%; max-width: 500px; box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid var(--slate-200); animation: zoomIn 0.2s ease;">
+        <div class="modal-header" style="background: #ffffff !important; padding: 18px 24px; border-bottom: 1px solid var(--slate-100); display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="badge badge-primary" style="font-size: 11px;">Penempatan Aset</span>
+                <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--slate-900);">Pilih Bentuk di Denah</h3>
+            </div>
+            <button type="button" class="btn-close" onclick="closePlaceAssetModal()">✕</button>
+        </div>
+
+        <div class="modal-body" style="background: #ffffff !important; padding: 22px 24px; color: var(--slate-800);">
+            <div style="padding: 12px 14px; background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: var(--radius-md); margin-bottom: 18px;">
+                <span style="font-size: 11px; color: var(--slate-500); display: block;">Perangkat yang dipilih:</span>
+                <strong id="placeTargetName" style="font-size: 14px; color: var(--slate-900); display: block;">PC / Komputer - Unit 1</strong>
+                <span id="placeTargetCode" style="font-size: 11.5px; font-family: var(--font-mono); color: var(--primary); display: block; margin-top: 2px;">1043.01.06.00.03 / ...</span>
+            </div>
+
+            <p style="font-size: 13px; color: var(--slate-600); margin: 0 0 14px; line-height: 1.4;">
+                Bagaimana Anda ingin menampilkan aset ini pada kanvas denah?
+            </p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                <!-- Pilihan 1: Bentuk Shape -->
+                <button type="button" class="place-option-card" onclick="confirmPlaceAsset('shape')">
+                    <div class="option-icon" style="background: #eff6ff; color: #2563eb;">⬛</div>
+                    <strong style="font-size: 13px; color: var(--slate-900); margin-bottom: 4px;">Bentuk Shape</strong>
+                    <span style="font-size: 11px; color: var(--slate-500); line-height: 1.35;">
+                        Kotak / meja interaktif dengan ukuran yang bisa ditarik/diubah (cocok untuk PC & meja fisik).
+                    </span>
+                </button>
+
+                <!-- Pilihan 2: Bentuk Titik -->
+                <button type="button" class="place-option-card" onclick="confirmPlaceAsset('dot')">
+                    <div class="option-icon" style="background: #ecfdf5; color: #059669;">📍</div>
+                    <strong style="font-size: 13px; color: var(--slate-900); margin-bottom: 4px;">Bentuk Titik</strong>
+                    <span style="font-size: 11px; color: var(--slate-500); line-height: 1.35;">
+                        Titik marker beacon kompak dengan sinyal berkedip (cocok untuk AC, Proyektor, Kursi, dll).
+                    </span>
+                </button>
+            </div>
+
+            <div style="font-size: 11.5px; color: var(--slate-400); text-align: center;">
+                💡 <em>Bentuk representasi ini dapat diubah kapan saja melalui panel Inspector di Mode Desain.</em>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detail Aset Pop-up Interaktif (Solid White, No Collision) -->
+<div id="assetDetailModal" class="modal-backdrop" style="display: none;" onclick="if(event.target === this) closeAssetDetailModal()">
+    <div class="modal-card modal-content" style="background: #ffffff !important; border-radius: 16px; width: 100%; max-width: 520px; box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid var(--slate-200); animation: zoomIn 0.2s ease;">
+        <div class="modal-header" style="background: #ffffff !important; padding: 18px 24px; border-bottom: 1px solid var(--slate-100); display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="modalStatusDot" class="marker-status-dot green"></span>
+                <h3 id="modalTitle" style="margin: 0; font-size: 16px; font-weight: 800; color: var(--slate-900);">Detail Komputer</h3>
+            </div>
+            <button type="button" class="btn-close" onclick="closeAssetDetailModal()">✕</button>
+        </div>
+
+        <div class="modal-body" style="background: #ffffff !important; padding: 22px 24px; color: var(--slate-800);">
+            <!-- Asset Photo / Media Preview -->
+            <div id="modalPhotoContainer" class="modal-asset-media" style="display: none; width: 100%; height: 180px; border-radius: var(--radius-md); background: var(--slate-100); overflow: hidden; margin-bottom: 16px; border: 1px solid var(--slate-200);">
+                <img id="modalPhotoImage" src="" alt="Foto Aset" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+
+            <!-- Identity Bar -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--slate-100);">
+                <div>
+                    <h2 id="modalAssetName" style="margin: 0 0 4px; font-size: 18px; font-weight: 800; color: var(--slate-900);">PC-01</h2>
+                    <span id="modalAssetCode" style="font-family: var(--font-mono); font-size: 12px; color: var(--slate-500); letter-spacing: 0.04em;">Kode: -</span>
+                </div>
+                <span id="modalStatusBadge" class="badge badge-success">Normal</span>
+            </div>
+
+            <!-- Spec and Attributes Data List -->
+            <div style="display: flex; flex-direction: column; gap: 11px; margin-bottom: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--slate-100); font-size: 13px;">
+                    <span style="color: var(--slate-500); font-weight: 600;">Meja Kerja</span>
+                    <strong id="modalDeskLabel" style="color: var(--slate-900); font-size: 14px;">PC-01</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--slate-100); font-size: 13px;">
+                    <span style="color: var(--slate-500); font-weight: 600;">Ruangan Lab</span>
+                    <span id="modalLocationName" style="color: var(--slate-900); font-weight: 700; text-align: right;">{{ current_location.nama_lab if current_location else '-' }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--slate-100); font-size: 13px;">
+                    <span style="color: var(--slate-500); font-weight: 600;">Kategori</span>
+                    <span id="modalCategoryName" style="color: var(--slate-900); font-weight: 700; text-align: right;">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 8px; border-bottom: 1px solid var(--slate-100); font-size: 13px; gap: 16px;">
+                    <span style="color: var(--slate-500); font-weight: 600; flex-shrink: 0;">Spesifikasi</span>
+                    <span id="modalSpecs" style="color: var(--slate-700); font-size: 12.5px; font-weight: 500; text-align: right;">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--slate-100); font-size: 13px;">
+                    <span style="color: var(--slate-500); font-weight: 600;">Tahun Pengadaan</span>
+                    <span style="color: var(--slate-900); font-weight: 600; text-align: right;"><span id="modalYear">-</span> (Sisa Umur: <strong id="modalUsefulLife" style="color: var(--primary);">-</strong> thn)</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--slate-100); font-size: 13px;">
+                    <span style="color: var(--slate-500); font-weight: 600;">Nilai Buku Berjalan</span>
+                    <strong id="modalBookValue" style="color: var(--emerald-600); font-weight: 800; text-align: right;">-</strong>
+                </div>
+                <div id="modalServiceRow" style="display: none; justify-content: space-between; align-items: flex-start; padding-bottom: 8px; border-bottom: 1px solid var(--slate-100); font-size: 13px; gap: 16px;">
+                    <span style="color: var(--slate-500); font-weight: 600; flex-shrink: 0;">Servis Terakhir</span>
+                    <span id="modalServiceDesc" style="color: var(--amber-700); font-size: 12px; font-weight: 600; text-align: right;">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer" style="background: var(--slate-50) !important; padding: 16px 24px; border-top: 1px solid var(--slate-100); display: flex; justify-content: space-between; align-items: center;">
+            <button type="button" class="btn btn-outline" onclick="closeAssetDetailModal()">Tutup</button>
+            <a id="modalDetailLink" href="#" class="btn btn-primary">
+                Lihat Detail Lengkap →
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Upload Gambar Denah Ruangan (Opsional) -->
+{% if has_permission('edit_assets') %}
+<div id="uploadDenahModal" class="modal-backdrop" style="display: none;" onclick="if(event.target === this) closeUploadDenahModal()">
+    <div class="modal-card modal-content" style="background: #ffffff !important; border-radius: 16px; width: 100%; max-width: 480px; box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid var(--slate-200); animation: zoomIn 0.2s ease;">
+        <div class="modal-header" style="background: #ffffff !important; padding: 18px 24px; border-bottom: 1px solid var(--slate-100); display: flex; align-items: center; justify-content: space-between;">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--slate-900);">Unggah Latar Denah (Opsional)</h3>
+            <button type="button" class="btn-close" onclick="closeUploadDenahModal()">✕</button>
+        </div>
+
+        <form method="POST" action="{{ url_for('main.upload_floor_plan_image') }}" enctype="multipart/form-data">
+            <input type="hidden" name="location_id" value="{{ current_location.id if current_location else '' }}">
+            <div class="modal-body" style="background: #ffffff !important; padding: 22px 24px;">
+                <p style="margin: 0 0 14px; font-size: 13px; color: var(--slate-600); line-height: 1.5;">
+                    Sistem In-App Designer sudah menggambar denah ruangan secara otomatis. Anda hanya perlu mengunggah berkas ini jika ingin menambahkan watermark denah arsitektur cetak khusus.
+                </p>
+
+                <div style="border: 2px dashed var(--slate-300); border-radius: var(--radius-md); padding: 24px; text-align: center; background: var(--slate-50); margin-bottom: 16px;">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--slate-400); margin-bottom: 8px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <label style="display: block; font-weight: 700; font-size: 13px; color: var(--primary); cursor: pointer; margin-bottom: 4px;">
+                        Pilih Berkas (.png, .jpg, .svg)
+                        <input type="file" name="denah_file" accept=".png,.jpg,.jpeg,.svg,.webp" required style="display: none;" onchange="document.getElementById('fileNamePreview').innerText = this.files[0] ? this.files[0].name : '';">
+                    </label>
+                    <span id="fileNamePreview" style="font-size: 12px; color: var(--slate-500); display: block;">Format: PNG, JPG, SVG</span>
+                </div>
+
+                {% if current_location and current_location.denah_image %}
+                <div style="padding: 10px 14px; background: var(--emerald-50); border: 1px solid var(--emerald-border); border-radius: var(--radius-md); font-size: 12px; color: var(--emerald-800); display: flex; justify-content: space-between; align-items: center;">
+                    <span>Latar aktif: <strong>{{ current_location.denah_image }}</strong></span>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="modal-footer" style="background: var(--slate-50) !important; padding: 16px 24px; border-top: 1px solid var(--slate-100); display: flex; justify-content: space-between; align-items: center;">
+                {% if current_location and current_location.denah_image %}
+                <button type="submit" formaction="{{ url_for('main.remove_floor_plan_image') }}" class="btn btn-danger btn-sm" onclick="return confirm('Hapus latar belakang denah kustom?');">
+                    Hapus Latar
+                </button>
+                {% else %}
+                <span></span>
+                {% endif %}
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-outline" onclick="closeUploadDenahModal()">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan Latar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// --- IN-APP DESIGNER STATE ---
+const currentLocationId = {{ current_location.id if current_location else 'null' }};
+let rawAssets = {{ assets_json | safe }};
+let layoutData = {{ layout_json | safe }};
+
+// State objects
+let isDesignerMode = false;
+let currentFilter = 'all';
+let searchQuery = '';
+let selectedWorkstationId = null;
+let selectedFixtureId = null;
+let pendingPlaceAssetId = null;
+let hasUnsavedChanges = false;
+let savedLayoutSnapshot = JSON.stringify(layoutData || {});
+
+// Dragging & Resizing State
+let activeDragEl = null;
+let dragStartX = 0;
+let dragStartY = 0;
+let elementStartX = 0;
+let elementStartY = 0;
+
+// Ensure schema structure
+if (!layoutData.fixtures) layoutData.fixtures = [];
+if (!layoutData.workstations) layoutData.workstations = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    renderCanvas();
+    renderUnplacedList();
+});
+
+// --- RENDER IN-APP CANVAS ---
+function renderCanvas() {
+    const stage = document.getElementById('inappCanvasStage');
+    const fixContainer = document.getElementById('fixturesContainer');
+    const wsContainer = document.getElementById('workstationsContainer');
+    const emptyState = document.getElementById('canvasEmptyState');
+    if (!stage || !fixContainer || !wsContainer) return;
+
+    // Check empty state
+    const totalItems = (layoutData.fixtures ? layoutData.fixtures.length : 0) + 
+                       (layoutData.workstations ? layoutData.workstations.length : 0);
+    if (emptyState) {
+        emptyState.style.display = (totalItems === 0) ? 'flex' : 'none';
+    }
+
+    // Update Room Title
+    const titleHeader = document.getElementById('roomTitleHeader');
+    if (titleHeader) {
+        titleHeader.innerText = layoutData.room_title || 'LABORATORIUM';
+    }
+
+    // 1. Render Freeform Geometric Shapes (Ms. Word & Draw.io style)
+    fixContainer.innerHTML = '';
+    (layoutData.fixtures || []).forEach(fix => {
+        const isSelected = (isDesignerMode && selectedFixtureId === fix.id);
+        const el = document.createElement('div');
+        el.className = `canvas-fixture fixture-${fix.type} ${isSelected ? 'is-selected' : ''}`;
+        el.id = `fixture-${fix.id}`;
+        el.style.left = `${fix.x}%`;
+        el.style.top = `${fix.y}%`;
+        el.style.width = `${fix.w}%`;
+        el.style.height = `${fix.h}%`;
+
+        // Render shape geometry
+        let innerHtml = '';
+        const safeLabel = fix.label ? escapeHtml(fix.label).replace(/\n/g, '<br>') : '';
+
+        if (fix.type === 'line' || fix.type === 'line-h' || fix.type === 'line-v') {
+            innerHtml = `
+                <svg width="100%" height="100%" style="overflow: visible; display: block; pointer-events: none;">
+                    <line x1="0%" y1="50%" x2="100%" y2="50%" stroke="#e2e8f0" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+                ${safeLabel ? `<span class="shape-text" style="position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #cbd5e1; white-space: nowrap; pointer-events: none;">${safeLabel}</span>` : ''}
+            `;
+        } else if (fix.type === 'oval') {
+            innerHtml = `
+                ${safeLabel ? `<span class="shape-text" style="position: relative; z-index: 2; pointer-events: none;">${safeLabel}</span>` : ''}
+            `;
+        } else if (fix.type === 'triangle') {
+            innerHtml = `
+                <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="position: absolute; inset: 0; pointer-events: none;">
+                    <polygon points="50,4 96,96 4,96" fill="rgba(168, 85, 247, 0.2)" stroke="#c084fc" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
+                </svg>
+                ${safeLabel ? `<span class="shape-text" style="position: relative; z-index: 2; margin-top: 18%; pointer-events: none;">${safeLabel}</span>` : ''}
+            `;
+        } else {
+            // Rectangle / Box / Other
+            innerHtml = `
+                ${safeLabel ? `<span class="shape-text" style="position: relative; z-index: 2; pointer-events: none;">${safeLabel}</span>` : ''}
+            `;
+        }
+
+        // Floating Control Bar on selected shape
+        if (isSelected) {
+            innerHtml += `
+                <div class="selected-control-bar" onmousedown="event.stopPropagation();">
+                    <span class="dim-badge">${Math.round(fix.w)}% × ${Math.round(fix.h)}%</span>
+                    <span class="del-btn" title="Hapus bentuk (atau tekan tombol Delete)" onclick="deleteFixture(event, '${fix.id}')">✕</span>
+                </div>
+            `;
+        }
+
+        el.innerHTML = innerHtml;
+
+        // Append 8-directional resize handles when selected (like Office / Draw.io)
+        if (isSelected) {
+            ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach(dir => {
+                const handle = document.createElement('div');
+                handle.className = `resize-handle handle-${dir}`;
+                handle.title = `Tarik untuk mengubah ukuran (${dir.toUpperCase()})`;
+                handle.addEventListener('mousedown', function(e) {
+                    startHandleResize(e, dir, fix, el);
+                });
+                el.appendChild(handle);
+            });
+        }
+
+        // Element Click & Move Handler
+        el.addEventListener('mousedown', function(e) {
+            if (e.target.closest('.resize-handle') || e.target.closest('.del-btn')) return;
+            if (isDesignerMode) {
+                if (selectedFixtureId !== fix.id) {
+                    selectFixture(fix);
+                }
+                startShapeDrag(e, fix, el);
+            }
+        });
+
+        fixContainer.appendChild(el);
+    });
+
+    // 2. Render Placed Assets (Shape or Dot representation)
+    wsContainer.innerHTML = '';
+    const query = searchQuery.trim().toLowerCase();
+    let placedCount = 0;
+
+    (layoutData.workstations || []).forEach(ws => {
+        const boundAsset = ws.asset_id ? rawAssets.find(a => a.id === ws.asset_id) : null;
+        if (boundAsset) placedCount++;
+
+        const isDot = (ws.display_type === 'dot');
+        const isSelected = (isDesignerMode && selectedWorkstationId === ws.id);
+
+        // Status styling
+        let statusClass = 'unbound';
+        let statusDotClass = '';
+        if (boundAsset) {
+            statusClass = `status-${boundAsset.status_color}`;
+            statusDotClass = boundAsset.status_color;
+        }
+
+        // Filter condition check
+        const passesFilter = (currentFilter === 'all') || 
+            (boundAsset && boundAsset.status_color === currentFilter);
+
+        // Search match check
+        const matchesQuery = query === '' || (boundAsset && (
+            (boundAsset.nama_aset || '').toLowerCase().includes(query) ||
+            (boundAsset.kode_aset || '').toLowerCase().includes(query) ||
+            (boundAsset.format_label || '').toLowerCase().includes(query) ||
+            (ws.label || '').toLowerCase().includes(query)
+        )) || (ws.label || '').toLowerCase().includes(query);
+
+        const el = document.createElement('div');
+        el.className = `canvas-workstation ${isDot ? 'display-dot' : 'display-shape'} ${statusClass} ${isSelected ? 'is-selected' : ''}`;
+        el.id = `ws-${ws.id}`;
+        el.style.left = `${ws.x}%`;
+        el.style.top = `${ws.y}%`;
+
+        if (isDot) {
+            el.style.width = `${ws.w || 3.5}%`;
+            el.style.height = `${ws.h || 3.5}%`;
+            el.innerHTML = `
+                <div class="dot-beacon-wrapper">
+                    <div class="dot-pulse-wave"></div>
+                    <div class="dot-core"></div>
+                    <div class="dot-label-pill">${escapeHtml(ws.label)}</div>
+                </div>
+                ${isSelected ? `
+                    <div class="selected-control-bar" onmousedown="event.stopPropagation();">
+                        <span class="dim-badge">${escapeHtml(ws.label)}</span>
+                        <span class="del-btn" title="Lepas aset" onclick="removeWorkstation(event, '${ws.id}')">✕</span>
+                    </div>
+                ` : `
+                    <span class="element-delete-btn" 
+                          title="Lepas dari denah" 
+                          onmousedown="event.stopPropagation();" 
+                          onclick="removeWorkstation(event, '${ws.id}')">✕</span>
+                `}
+            `;
+        } else {
+            el.style.width = `${ws.w || 12.5}%`;
+            el.style.height = `${ws.h || 12}%`;
+            el.innerHTML = `
+                <span class="workstation-label">${escapeHtml(ws.label)}</span>
+                <div class="workstation-dot-badge">
+                    <span class="dot ${statusDotClass}"></span>
+                    <span style="font-size: 10px; opacity: 0.85;">${boundAsset ? (boundAsset.kategori || 'Aset') : 'Kosong'}</span>
+                </div>
+                ${isSelected ? `
+                    <div class="selected-control-bar" onmousedown="event.stopPropagation();">
+                        <span class="dim-badge">${Math.round(ws.w)}% × ${Math.round(ws.h)}%</span>
+                        <span class="del-btn" title="Lepas aset" onclick="removeWorkstation(event, '${ws.id}')">✕</span>
+                    </div>
+                ` : `
+                    <span class="element-delete-btn" 
+                          title="Lepas dari denah" 
+                          onmousedown="event.stopPropagation();" 
+                          onclick="removeWorkstation(event, '${ws.id}')">✕</span>
+                `}
+            `;
+
+            // Append 8 resize handles for workstation shape when selected
+            if (isSelected) {
+                ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach(dir => {
+                    const handle = document.createElement('div');
+                    handle.className = `resize-handle handle-${dir}`;
+                    handle.title = `Tarik untuk mengubah ukuran (${dir.toUpperCase()})`;
+                    handle.addEventListener('mousedown', function(e) {
+                        startHandleResize(e, dir, ws, el);
+                    });
+                    el.appendChild(handle);
+                });
+            }
+        }
+
+        if (!passesFilter) {
+            el.style.display = 'none';
+        }
+
+        if (query !== '') {
+            if (matchesQuery) {
+                el.classList.add('pulse-active');
+            } else {
+                el.classList.add('dimmed');
+            }
+        }
+
+        // Click / Drag Handler
+        el.addEventListener('mousedown', function(e) {
+            if (e.target.closest('.resize-handle') || e.target.closest('.del-btn') || e.target.closest('.element-delete-btn')) return;
+            if (!isDesignerMode) {
+                if (boundAsset) {
+                    openAssetDetailModal(boundAsset, ws.label);
+                } else {
+                    alert(`Elemen "${ws.label}" belum terhubung dengan data aset master.`);
+                }
+            } else {
+                if (selectedWorkstationId !== ws.id) {
+                    selectWorkstation(ws);
+                }
+                startShapeDrag(e, ws, el);
+            }
+        });
+
+        wsContainer.appendChild(el);
+    });
+
+    // Update Counter Badges
+    const placedBadge = document.getElementById('placedCounterBadge');
+    if (placedBadge) placedBadge.innerText = `${placedCount} Aset Terpasang`;
+    const totalPill = document.getElementById('totalPlacedPill');
+    if (totalPill) totalPill.innerText = placedCount;
+}
+
+// Stage Deselect Listener (Clicking canvas background clears selection)
+document.addEventListener('DOMContentLoaded', function() {
+    const stage = document.getElementById('inappCanvasStage');
+    if (stage) {
+        stage.addEventListener('mousedown', function(e) {
+            if (!isDesignerMode) return;
+            if (e.target === stage || e.target.classList.contains('room-perimeter-boundary') || e.target.id === 'fixturesContainer' || e.target.id === 'workstationsContainer') {
+                deselectAll();
+            }
+        });
+    }
+
+    // Keyboard Shortcuts (Delete / Backspace / Escape)
+    document.addEventListener('keydown', function(e) {
+        if (!isDesignerMode) return;
+        const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+        if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            if (selectedFixtureId) {
+                deleteSelectedFixtureFromInspector();
+                e.preventDefault();
+            } else if (selectedWorkstationId) {
+                unbindSelectedAsset();
+                e.preventDefault();
+            }
+        } else if (e.key === 'Escape') {
+            deselectAll();
+        }
+    });
+});
+
+function deselectAll() {
+    selectedWorkstationId = null;
+    selectedFixtureId = null;
+    closeInspector();
+    renderCanvas();
+}
+
+// --- RENDER UNPLACED ASSETS DRAWER ---
+function renderUnplacedList() {
+    const container = document.getElementById('unplacedListContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const placedAssetIds = new Set(
+        (layoutData.workstations || []).map(ws => ws.asset_id).filter(Boolean)
+    );
+
+    const searchInput = document.getElementById('unplacedSearchInput');
+    const q = (searchInput ? searchInput.value : '').trim().toLowerCase();
+
+    const unplaced = rawAssets.filter(a => {
+        if (placedAssetIds.has(a.id)) return false;
+        if (q === '') return true;
+        const nameMatch = (a.nama_aset || '').toLowerCase().includes(q);
+        const codeMatch = (a.kode_aset || '').toLowerCase().includes(q);
+        const labelMatch = (a.format_label || '').toLowerCase().includes(q);
+        return nameMatch || codeMatch || labelMatch;
+    });
+
+    const totalUnplaced = rawAssets.filter(a => !placedAssetIds.has(a.id)).length;
+    const badge = document.getElementById('unplacedCounterBadge');
+    if (badge) badge.innerText = `${totalUnplaced} Unit`;
+
+    if (unplaced.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 24px 12px; color: var(--slate-400); font-size: 12px; background: var(--slate-50); border: 1px dashed var(--slate-200); border-radius: var(--radius-md);">
+                ${totalUnplaced === 0 ? 'Semua aset laboratorium ini telah terpasang pada denah.' : 'Tidak ada aset yang cocok dengan pencarian.'}
+            </div>
+        `;
+        return;
+    }
+
+    unplaced.forEach(asset => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'unplaced-item';
+        itemEl.id = `unplaced-${asset.id}`;
+
+        const codeDisplay = asset.format_label || asset.kode_aset;
+
+        itemEl.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                <span class="marker-status-dot ${asset.status_color}" style="flex-shrink: 0;"></span>
+                <div style="min-width: 0;">
+                    <strong style="display: block; font-size: 12px; color: var(--slate-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(asset.nama_aset)}</strong>
+                    <small style="color: var(--slate-500); font-size: 10.5px; font-family: var(--font-mono); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(codeDisplay)}</small>
+                </div>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" style="padding: 4px 10px; font-size: 11px; flex-shrink: 0; font-weight: 700;" onclick="openPlaceAssetModal(${asset.id})">
+                + Pasang
+            </button>
+        `;
+
+        container.appendChild(itemEl);
+    });
+}
+
+// --- PLACEMENT MODAL (SHAPE VS TITIK) ---
+function openPlaceAssetModal(assetId) {
+    pendingPlaceAssetId = assetId;
+    const asset = rawAssets.find(a => a.id === assetId);
+    if (!asset) return;
+
+    document.getElementById('placeTargetName').innerText = asset.nama_aset;
+    document.getElementById('placeTargetCode').innerText = asset.format_label ? `Label: ${asset.format_label}` : `Kode: ${asset.kode_aset}`;
+
+    const modal = document.getElementById('placeAssetModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closePlaceAssetModal() {
+    pendingPlaceAssetId = null;
+    const modal = document.getElementById('placeAssetModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function confirmPlaceAsset(displayType) {
+    if (!pendingPlaceAssetId) return;
+    const asset = rawAssets.find(a => a.id === pendingPlaceAssetId);
+    if (!asset) {
+        closePlaceAssetModal();
+        return;
+    }
+
+    // Auto-generate clean, readable default label
+    let defaultLabel = asset.nama_aset;
+    const lower = defaultLabel.toLowerCase();
+    if (lower.includes('komputer') || lower.includes('pc')) {
+        const matches = defaultLabel.match(/(\d+)/);
+        const num = matches ? matches[1] : (layoutData.workstations || []).length + 1;
+        defaultLabel = `PC-${String(num).padStart(2, '0')}`;
+    } else if (lower.includes('meja')) {
+        const matches = defaultLabel.match(/(\d+)/);
+        const num = matches ? matches[1] : (layoutData.workstations || []).length + 1;
+        defaultLabel = `Meja-${String(num).padStart(2, '0')}`;
+    } else if (lower.includes('kursi')) {
+        const matches = defaultLabel.match(/(\d+)/);
+        const num = matches ? matches[1] : (layoutData.workstations || []).length + 1;
+        defaultLabel = `K-${String(num).padStart(2, '0')}`;
+    } else if (lower.includes('ac')) {
+        const matches = defaultLabel.match(/(\d+)/);
+        const num = matches ? matches[1] : 1;
+        defaultLabel = `AC-${num}`;
+    } else if (lower.includes('proyektor') || lower.includes('lcd')) {
+        defaultLabel = 'Proyektor';
+    }
+
+    const isDot = (displayType === 'dot');
+    const newWs = {
+        id: `ws-${Date.now()}`,
+        label: defaultLabel,
+        x: 44.0,
+        y: 44.0,
+        w: isDot ? 3.5 : 12.5,
+        h: isDot ? 3.5 : 12.0,
+        display_type: displayType, // 'shape' or 'dot'
+        asset_id: asset.id
+    };
+
+    if (!layoutData.workstations) layoutData.workstations = [];
+    layoutData.workstations.push(newWs);
+    hasUnsavedChanges = true;
+
+    closePlaceAssetModal();
+    renderCanvas();
+    renderUnplacedList();
+
+    if (isDesignerMode) {
+        selectWorkstation(newWs);
+    }
+}
+
+// --- DRAG & MOVE ENGINE ---
+function startShapeDrag(e, itemData, domEl) {
+    if (!isDesignerMode) return;
+    if (e.target.closest('.resize-handle') || e.target.closest('.del-btn')) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    activeDragEl = domEl;
+    const stage = document.getElementById('inappCanvasStage');
+    const stageRect = stage.getBoundingClientRect();
+
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    elementStartX = itemData.x;
+    elementStartY = itemData.y;
+
+    const snapEnabled = document.getElementById('snapGridCb').checked;
+    const gridStep = 1.0;
+
+    function onMouseMove(moveEvent) {
+        if (!activeDragEl) return;
+        const deltaX = ((moveEvent.clientX - dragStartX) / stageRect.width) * 100;
+        const deltaY = ((moveEvent.clientY - dragStartY) / stageRect.height) * 100;
+
+        let newX = elementStartX + deltaX;
+        let newY = elementStartY + deltaY;
+
+        if (snapEnabled) {
+            newX = Math.round(newX / gridStep) * gridStep;
+            newY = Math.round(newY / gridStep) * gridStep;
+        }
+
+        newX = Math.max(1, Math.min(99 - (itemData.w || 4), newX));
+        newY = Math.max(1, Math.min(99 - (itemData.h || 4), newY));
+
+        itemData.x = Number(newX.toFixed(1));
+        itemData.y = Number(newY.toFixed(1));
+
+        domEl.style.left = `${itemData.x}%`;
+        domEl.style.top = `${itemData.y}%`;
+        hasUnsavedChanges = true;
+    }
+
+    function onMouseUp() {
+        activeDragEl = null;
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+    }
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+}
+
+// --- 8-DIRECTIONAL RESIZE ENGINE (OFFICE & DRAW.IO STYLE) ---
+function startHandleResize(e, handleDir, itemData, domEl) {
+    if (!isDesignerMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const stage = document.getElementById('inappCanvasStage');
+    const stageRect = stage.getBoundingClientRect();
+
+    const startClientX = e.clientX;
+    const startClientY = e.clientY;
+
+    const startX = itemData.x;
+    const startY = itemData.y;
+    const startW = itemData.w || 12.0;
+    const startH = itemData.h || 10.0;
+
+    const snapEnabled = document.getElementById('snapGridCb').checked;
+    const gridStep = 1.0;
+
+    function onMouseMove(moveEvent) {
+        const deltaX = ((moveEvent.clientX - startClientX) / stageRect.width) * 100;
+        const deltaY = ((moveEvent.clientY - startClientY) / stageRect.height) * 100;
+
+        let newX = startX;
+        let newY = startY;
+        let newW = startW;
+        let newH = startH;
+
+        if (handleDir.includes('e')) {
+            newW = Math.max(1.5, startW + deltaX);
+        }
+        if (handleDir.includes('s')) {
+            newH = Math.max(0.8, startH + deltaY);
+        }
+        if (handleDir.includes('w')) {
+            const possibleW = startW - deltaX;
+            if (possibleW >= 1.5) {
+                newW = possibleW;
+                newX = startX + deltaX;
+            }
+        }
+        if (handleDir.includes('n')) {
+            const possibleH = startH - deltaY;
+            if (possibleH >= 0.8) {
+                newH = possibleH;
+                newY = startY + deltaY;
+            }
+        }
+
+        if (snapEnabled) {
+            newW = Math.round(newW / gridStep) * gridStep;
+            newH = Math.round(newH / gridStep) * gridStep;
+            newX = Math.round(newX / gridStep) * gridStep;
+            newY = Math.round(newY / gridStep) * gridStep;
+        }
+
+        newX = Math.max(1, Math.min(99 - newW, newX));
+        newY = Math.max(1, Math.min(99 - newH, newY));
+
+        itemData.x = Number(newX.toFixed(1));
+        itemData.y = Number(newY.toFixed(1));
+        itemData.w = Number(newW.toFixed(1));
+        itemData.h = Number(newH.toFixed(1));
+
+        domEl.style.left = `${itemData.x}%`;
+        domEl.style.top = `${itemData.y}%`;
+        domEl.style.width = `${itemData.w}%`;
+        domEl.style.height = `${itemData.h}%`;
+
+        const dimBadge = domEl.querySelector('.dim-badge');
+        if (dimBadge) dimBadge.innerText = `${Math.round(itemData.w)}% × ${Math.round(itemData.h)}%`;
+
+        hasUnsavedChanges = true;
+
+        // Keep Inspector inputs in sync
+        if (selectedFixtureId === itemData.id) {
+            const wInput = document.getElementById('inspectorFixWidthInput');
+            const hInput = document.getElementById('inspectorFixHeightInput');
+            if (wInput) wInput.value = itemData.w;
+            if (hInput) hInput.value = itemData.h;
+        } else if (selectedWorkstationId === itemData.id) {
+            const wInput = document.getElementById('inspectorWidthInput');
+            const hInput = document.getElementById('inspectorHeightInput');
+            if (wInput) wInput.value = itemData.w;
+            if (hInput) hInput.value = itemData.h;
+        }
+    }
+
+    function onMouseUp() {
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+    }
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+}
+
+// --- MS. WORD & DRAW.IO SHAPES CREATION (Line, Rectangle, Oval, Triangle) ---
+function addShape(type, defaultLabel) {
+    let w = 18.0;
+    let h = 12.0;
+    let label = defaultLabel || '';
+
+    if (type === 'line') {
+        w = 24.0;
+        h = 2.5;
+    } else if (type === 'rectangle') {
+        w = 18.0;
+        h = 12.0;
+    } else if (type === 'oval') {
+        w = 14.0;
+        h = 14.0;
+    } else if (type === 'triangle') {
+        w = 14.0;
+        h = 14.0;
+    }
+
+    const newFix = {
+        id: `fix-${Date.now()}`,
+        type: type,
+        label: label,
+        x: 40.0,
+        y: 40.0,
+        w: w,
+        h: h
+    };
+
+    if (!layoutData.fixtures) layoutData.fixtures = [];
+    layoutData.fixtures.push(newFix);
+    hasUnsavedChanges = true;
+    renderCanvas();
+    selectFixture(newFix);
+}
+
+// Compatibility alias for addFixture
+function addFixture(type, defaultLabel) {
+    addShape(type, defaultLabel);
+}
+
+function deleteFixture(e, fixId) {
+    if (e) {
+        if (typeof e.stopPropagation === 'function') e.stopPropagation();
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+    }
+    if (!isDesignerMode) return;
+    layoutData.fixtures = (layoutData.fixtures || []).filter(f => String(f.id) !== String(fixId));
+    hasUnsavedChanges = true;
+    if (selectedFixtureId === fixId) closeInspector();
+    renderCanvas();
+}
+
+function removeWorkstation(e, wsId) {
+    if (e) {
+        if (typeof e.stopPropagation === 'function') e.stopPropagation();
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+    }
+    if (!isDesignerMode) return;
+    layoutData.workstations = (layoutData.workstations || []).filter(w => String(w.id) !== String(wsId));
+    hasUnsavedChanges = true;
+    if (selectedWorkstationId === wsId) closeInspector();
+    renderCanvas();
+    renderUnplacedList();
+}
+
+// --- ELEMENT INSPECTOR ---
+function selectWorkstation(ws) {
+    selectedWorkstationId = ws.id;
+    selectedFixtureId = null;
+
+    const boundAsset = ws.asset_id ? rawAssets.find(a => a.id === ws.asset_id) : null;
+    const isDot = (ws.display_type === 'dot');
+
+    const card = document.getElementById('elementInspectorCard');
+    const typeBadge = document.getElementById('inspectorTypeBadge');
+    const cardTitle = document.getElementById('inspectorCardTitle');
+    const assetSection = document.getElementById('inspectorAssetSection');
+    const fixtureSection = document.getElementById('inspectorFixtureSection');
+
+    typeBadge.innerText = 'Aset Terikat';
+    typeBadge.className = 'badge badge-primary';
+    cardTitle.innerText = `Inspector: ${ws.label}`;
+
+    // Asset Info
+    document.getElementById('inspectorAssetName').innerText = boundAsset ? boundAsset.nama_aset : 'Tanpa Binding';
+    document.getElementById('inspectorAssetCode').innerText = boundAsset ? (boundAsset.format_label || boundAsset.kode_aset) : '-';
+
+    // Representation buttons
+    const btnShape = document.getElementById('btnRepShape');
+    const btnDot = document.getElementById('btnRepDot');
+    const dimsRow = document.getElementById('inspectorDimsRow');
+
+    if (isDot) {
+        btnDot.className = 'rep-toggle-btn active';
+        btnShape.className = 'rep-toggle-btn';
+        if (dimsRow) dimsRow.style.display = 'none';
+    } else {
+        btnShape.className = 'rep-toggle-btn active';
+        btnDot.className = 'rep-toggle-btn';
+        if (dimsRow) dimsRow.style.display = 'grid';
+    }
+
+    // Inputs
+    document.getElementById('inspectorLabelInput').value = ws.label;
+    const wInput = document.getElementById('inspectorWidthInput');
+    const hInput = document.getElementById('inspectorHeightInput');
+    if (wInput) wInput.value = ws.w || 12.5;
+    if (hInput) hInput.value = ws.h || 12.0;
+
+    assetSection.style.display = 'flex';
+    fixtureSection.style.display = 'none';
+    card.style.display = 'block';
+
+    renderCanvas();
+}
+
+function switchSelectedRepresentation(newType) {
+    if (!selectedWorkstationId) return;
+    const ws = (layoutData.workstations || []).find(w => w.id === selectedWorkstationId);
+    if (!ws) return;
+
+    ws.display_type = newType;
+    if (newType === 'dot') {
+        ws.w = 3.5;
+        ws.h = 3.5;
+    } else {
+        ws.w = 12.5;
+        ws.h = 12.0;
+    }
+
+    hasUnsavedChanges = true;
+    renderCanvas();
+    selectWorkstation(ws);
+}
+
+function updateSelectedLabel(val) {
+    if (!selectedWorkstationId) return;
+    const ws = (layoutData.workstations || []).find(w => w.id === selectedWorkstationId);
+    if (ws) {
+        ws.label = val;
+        hasUnsavedChanges = true;
+        renderCanvas();
+    }
+}
+
+function updateSelectedDim(prop, val) {
+    if (!selectedWorkstationId) return;
+    const ws = (layoutData.workstations || []).find(w => w.id === selectedWorkstationId);
+    if (ws) {
+        ws[prop] = Math.max(1.5, parseFloat(val) || 10);
+        hasUnsavedChanges = true;
+        renderCanvas();
+    }
+}
+
+function unbindSelectedAsset() {
+    if (!selectedWorkstationId) return;
+    layoutData.workstations = (layoutData.workstations || []).filter(w => w.id !== selectedWorkstationId);
+    hasUnsavedChanges = true;
+    closeInspector();
+    renderCanvas();
+    renderUnplacedList();
+}
+
+function selectFixture(fix) {
+    selectedFixtureId = fix.id;
+    selectedWorkstationId = null;
+
+    const card = document.getElementById('elementInspectorCard');
+    const typeBadge = document.getElementById('inspectorTypeBadge');
+    const cardTitle = document.getElementById('inspectorCardTitle');
+    const assetSection = document.getElementById('inspectorAssetSection');
+    const fixtureSection = document.getElementById('inspectorFixtureSection');
+
+    // Friendly shape title
+    let shapeName = 'Persegi (Rectangle)';
+    if (fix.type === 'line' || fix.type === 'line-h' || fix.type === 'line-v') shapeName = 'Garis (Line)';
+    else if (fix.type === 'oval') shapeName = 'Oval / Lingkaran';
+    else if (fix.type === 'triangle') shapeName = 'Segitiga (Triangle)';
+
+    typeBadge.innerText = 'Bentuk Bebas';
+    typeBadge.className = 'badge badge-neutral';
+    cardTitle.innerText = `Inspector: ${shapeName}`;
+
+    document.getElementById('inspectorFixLabelInput').value = fix.label || '';
+    const wInput = document.getElementById('inspectorFixWidthInput');
+    const hInput = document.getElementById('inspectorFixHeightInput');
+    if (wInput) wInput.value = fix.w;
+    if (hInput) hInput.value = fix.h;
+
+    assetSection.style.display = 'none';
+    fixtureSection.style.display = 'flex';
+    card.style.display = 'block';
+
+    renderCanvas();
+}
+
+function updateSelectedFixtureLabel(val) {
+    if (!selectedFixtureId) return;
+    const fix = (layoutData.fixtures || []).find(f => f.id === selectedFixtureId);
+    if (fix) {
+        fix.label = val;
+        hasUnsavedChanges = true;
+        renderCanvas();
+    }
+}
+
+function updateSelectedFixtureDim(prop, val) {
+    if (!selectedFixtureId) return;
+    const fix = (layoutData.fixtures || []).find(f => f.id === selectedFixtureId);
+    if (fix) {
+        fix[prop] = Math.max(0.5, parseFloat(val) || 5);
+        hasUnsavedChanges = true;
+        renderCanvas();
+    }
+}
+
+function deleteSelectedFixtureFromInspector() {
+    if (!selectedFixtureId) return;
+    deleteFixture(null, selectedFixtureId);
+    closeInspector();
+}
+
+function closeInspector() {
+    selectedWorkstationId = null;
+    selectedFixtureId = null;
+    const card = document.getElementById('elementInspectorCard');
+    if (card) card.style.display = 'none';
+}
+
+// --- TEMPLATES & PERSISTENCE ---
+async function applyTemplate20() {
+    if (!confirm('Terapkan template tata letak 20 PC standar (Lab Basis Data)? Posisi meja dan komponen akan diatur ulang.')) return;
+
+    try {
+        const response = await fetch("{{ url_for('main.reset_template_20') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ location_id: currentLocationId })
+        });
+
+        const res = await response.json();
+        if (res.success) {
+            layoutData = res.layout_config;
+            savedLayoutSnapshot = JSON.stringify(layoutData);
+            hasUnsavedChanges = false;
+            closeInspector();
+            renderCanvas();
+            renderUnplacedList();
+            alert('Template standar 20 PC berhasil diterapkan!');
+        } else {
+            alert('Gagal menerapkan template: ' + (res.message || 'Kesalahan'));
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Gagal menghubungi server.');
+    }
+}
+
+function clearCanvasLayout() {
+    if (!confirm('Kosongkan semua elemen dan komponen denah ini? Semua aset akan dikembalikan ke daftar belum terpasang.')) return;
+    layoutData.workstations = [];
+    layoutData.fixtures = [];
+    hasUnsavedChanges = true;
+    closeInspector();
+    renderCanvas();
+    renderUnplacedList();
+}
+
+async function saveInAppLayout() {
+    const saveBtn = document.getElementById('saveLayoutBtn');
+    saveBtn.disabled = true;
+    saveBtn.innerText = 'Menyimpan...';
+
+    try {
+        const response = await fetch("{{ url_for('main.save_floor_plan_layout') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                location_id: currentLocationId,
+                layout_config: layoutData
+            })
+        });
+
+        const res = await response.json();
+        if (res.success) {
+            savedLayoutSnapshot = JSON.stringify(layoutData);
+            hasUnsavedChanges = false;
+            alert(res.message || 'Konfigurasi denah berhasil disimpan!');
+            // Otomatis keluar dari mode desain setelah simpan
+            if (isDesignerMode) {
+                toggleDesignerMode();
+            }
+        } else {
+            alert('Gagal menyimpan: ' + (res.message || 'Kesalahan'));
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Gagal menyimpan tata letak.');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Simpan Layout
+        `;
+    }
+}
+
+// --- MODE TOGGLE & SEARCH ---
+function toggleDesignerMode() {
+    // Jika sedang dalam Mode Desain dan user ingin keluar
+    if (isDesignerMode) {
+        const currentLayoutStr = JSON.stringify(layoutData);
+        if (hasUnsavedChanges || currentLayoutStr !== savedLayoutSnapshot) {
+            const confirmExit = confirm('Perhatian: Anda memiliki perubahan layout yang belum disimpan.\n\nApakah Anda yakin ingin keluar dari Mode Desain tanpa menyimpan? (Perubahan yang belum disimpan tidak akan ter-save dan akan dibatalkan)');
+            if (!confirmExit) {
+                // User memilih batal, tetap berada di Mode Desain
+                return;
+            }
+            // Batalkan perubahan, kembalikan ke snapshot layout tersimpan
+            try {
+                layoutData = JSON.parse(savedLayoutSnapshot);
+                if (!layoutData.fixtures) layoutData.fixtures = [];
+                if (!layoutData.workstations) layoutData.workstations = [];
+            } catch (e) {
+                console.error('Error reverting layoutData snapshot:', e);
+            }
+            hasUnsavedChanges = false;
+        }
+    }
+
+    isDesignerMode = !isDesignerMode;
+    const stage = document.getElementById('inappCanvasStage');
+    const toolsPanel = document.getElementById('designerToolsPanel');
+    const toggleText = document.getElementById('toggleDesignerText');
+    const modeLabel = document.getElementById('canvasModeLabel');
+
+    if (isDesignerMode) {
+        stage.classList.add('designer-mode-active');
+        toolsPanel.style.display = 'flex';
+        toggleText.innerText = 'Keluar Mode Desain';
+        modeLabel.innerText = '(Mode Desain Aktif · Tambahkan bentuk bebas, geser meja, atau klik elemen untuk mengatur ukuran & binding)';
+        modeLabel.style.color = 'var(--primary)';
+    } else {
+        stage.classList.remove('designer-mode-active');
+        toolsPanel.style.display = 'none';
+        toggleText.innerText = 'Mode Desain Layout';
+        modeLabel.innerText = '(Mode Pantau · Klik meja komputer atau titik marker untuk melihat spesifikasi)';
+        modeLabel.style.color = 'var(--slate-500)';
+        closeInspector();
+    }
+
+    renderCanvas();
+    renderUnplacedList();
+}
+
+window.addEventListener('beforeunload', function(e) {
+    if (isDesignerMode && (hasUnsavedChanges || JSON.stringify(layoutData) !== savedLayoutSnapshot)) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
+
+function handleFloorSearch(query) {
+    searchQuery = query;
+    renderCanvas();
+}
+
+function setFloorFilter(filter, btn) {
+    currentFilter = filter;
+    document.querySelectorAll('.floor-pill').forEach(p => p.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    renderCanvas();
+}
+
+// --- SOLID MODAL POP-UP (NO COLLISION) ---
+function openAssetDetailModal(asset, deskLabel) {
+    document.getElementById('modalAssetName').innerText = asset.nama_aset;
+    document.getElementById('modalAssetCode').innerText = asset.format_label ? `Label: ${asset.format_label}` : `Kode: ${asset.kode_aset}`;
+    document.getElementById('modalDeskLabel').innerText = deskLabel || '-';
+    document.getElementById('modalLocationName').innerText = asset.lokasi;
+    document.getElementById('modalCategoryName').innerText = asset.kategori;
+    document.getElementById('modalSpecs').innerText = asset.deskripsi;
+    document.getElementById('modalYear').innerText = asset.tahun_pengadaan;
+    document.getElementById('modalUsefulLife').innerText = asset.sisa_umur;
+    document.getElementById('modalBookValue').innerText = asset.nilai_buku;
+    document.getElementById('modalDetailLink').href = asset.detail_url;
+
+    // Dot & Badge
+    const dot = document.getElementById('modalStatusDot');
+    dot.className = `marker-status-dot ${asset.status_color}`;
+
+    const badge = document.getElementById('modalStatusBadge');
+    badge.innerText = asset.status_label;
+    if (asset.status_color === 'green') badge.className = 'badge badge-success';
+    else if (asset.status_color === 'amber') badge.className = 'badge badge-warning';
+    else badge.className = 'badge badge-danger';
+
+    // Photo Preview
+    const photoContainer = document.getElementById('modalPhotoContainer');
+    const photoImg = document.getElementById('modalPhotoImage');
+    if (asset.foto_url) {
+        photoImg.src = asset.foto_url;
+        photoContainer.style.display = 'flex';
+    } else {
+        photoContainer.style.display = 'none';
+    }
+
+    // Service Log
+    const serviceRow = document.getElementById('modalServiceRow');
+    if (asset.service_info) {
+        serviceRow.style.display = 'flex';
+        document.getElementById('modalServiceDesc').innerHTML = `
+            <strong>${asset.service_info.tanggal}</strong>: ${escapeHtml(asset.service_info.deskripsi)} (Biaya: ${asset.service_info.biaya})
+        `;
+    } else {
+        serviceRow.style.display = 'none';
+    }
+
+    document.getElementById('assetDetailModal').style.display = 'flex';
+}
+
+function closeAssetDetailModal() {
+    document.getElementById('assetDetailModal').style.display = 'none';
+}
+
+function openUploadDenahModal() {
+    const m = document.getElementById('uploadDenahModal');
+    if (m) m.style.display = 'flex';
+}
+
+function closeUploadDenahModal() {
+    const m = document.getElementById('uploadDenahModal');
+    if (m) m.style.display = 'none';
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+</script>
+{% endblock %}

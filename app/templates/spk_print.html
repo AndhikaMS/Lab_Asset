@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laporan Prioritas Penggantian Aset Lab</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 2cm 2.5cm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 12pt;
+            color: #000;
+            line-height: 1.5;
+            margin: 0;
+            padding: 0;
+        }
+
+        .kop-surat {
+            text-align: center;
+            border-bottom: 3px double #000;
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+        }
+
+        .kop-surat h2 {
+            font-size: 14pt;
+            font-weight: bold;
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .kop-surat p {
+            font-size: 10pt;
+            margin: 3px 0;
+            color: #333;
+        }
+
+        .judul-laporan {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .judul-laporan h3 {
+            font-size: 13pt;
+            font-weight: bold;
+            text-decoration: underline;
+            text-transform: uppercase;
+            margin: 0 0 5px 0;
+        }
+
+        .judul-laporan p {
+            font-size: 11pt;
+            margin: 3px 0;
+        }
+
+        .info-bobot {
+            border: 1px solid #ccc;
+            padding: 10px 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            background: #f9f9f9;
+            font-size: 11pt;
+        }
+
+        .info-bobot strong {
+            margin-right: 5px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 10pt;
+        }
+
+        thead th {
+            background: #e8e8e8;
+            border: 1px solid #888;
+            padding: 8px 6px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        tbody td {
+            border: 1px solid #aaa;
+            padding: 6px 8px;
+            vertical-align: middle;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        tbody tr.kritis {
+            background: #ffe4e4 !important;
+        }
+
+        tbody tr.prioritas {
+            background: #fff9e6 !important;
+        }
+
+        .rank-col {
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .num-col {
+            text-align: right;
+        }
+
+        .center-col {
+            text-align: center;
+        }
+
+        .catatan-rekomendasi {
+            border-left: 4px solid #c00;
+            padding: 10px 15px;
+            font-size: 10pt;
+            font-style: italic;
+            background: #fff5f5;
+            margin-bottom: 20px;
+        }
+
+        .ttd-section {
+            margin-top: 40px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .ttd-box {
+            text-align: center;
+            width: 250px;
+        }
+
+        .ttd-box .ttd-title {
+            font-size: 11pt;
+            margin-bottom: 5px;
+        }
+
+        .ttd-box .ttd-space {
+            height: 70px;
+        }
+
+        .ttd-box .ttd-name {
+            font-weight: bold;
+            border-top: 1px solid #000;
+            padding-top: 5px;
+            font-size: 11pt;
+        }
+
+        .ttd-box .ttd-nik {
+            font-size: 10pt;
+            color: #555;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Kop Surat -->
+    <div class="kop-surat">
+        <h2>Laboratorium Fakultas Teknologi Informasi</h2>
+        <p>Universitas Bale Bandung</p>
+        <p>Jl. R.A.A. Wiranatakusumah No.7, Baleendah, Kabupaten Bandung, Jawa Barat 40375</p>
+    </div>
+
+    <!-- Judul Laporan -->
+    <div class="judul-laporan">
+        <h3>Laporan Prioritas Penggantian Aset Laboratorium</h3>
+        <p>Analisis Kelayakan &amp; Rekomendasi Peremajaan Perangkat</p>
+        <p>Tanggal Cetak: {{ date.strftime('%d %B %Y') }}</p>
+    </div>
+
+    <!-- Info Bobot -->
+    <div class="info-bobot">
+        <strong>Bobot Kriteria Penilaian yang Digunakan:</strong>
+        C1 (Sisa Umur Ekonomis / Cost) = <strong>{{ "%.2f"|format(bobot.bobot_c1) }}</strong> &nbsp;|&nbsp;
+        C2 (Tingkat Kerusakan Fisik / Benefit) = <strong>{{ "%.2f"|format(bobot.bobot_c2) }}</strong> &nbsp;|&nbsp;
+        C3 (Biaya Perawatan Historis / Benefit) = <strong>{{ "%.2f"|format(bobot.bobot_c3) }}</strong>
+    </div>
+
+    <!-- Catatan Rekomendasi -->
+    {% if ranking %}
+    <div class="catatan-rekomendasi">
+        <strong>Rekomendasi Utama:</strong>
+        Aset "<strong>{{ ranking[0].asset.nama_aset }}</strong>" (Kode: {{ ranking[0].asset.kode_aset }})
+        memiliki rasio penyusutan finansial tertinggi dan/atau tingkat kerusakan paling parah.
+        Sangat diprioritaskan untuk segera diganti dalam pengadaan berikutnya.
+    </div>
+    {% endif %}
+
+    <!-- Tabel Ranking -->
+    <table>
+        <thead>
+            <tr>
+                <th rowspan="2" style="width: 40px;">No.</th>
+                <th rowspan="2">Kode Aset</th>
+                <th rowspan="2">Nama Aset</th>
+                <th rowspan="2">Lokasi</th>
+                <th colspan="3">Nilai Kriteria</th>
+                <th colspan="3">Nilai Ternormalisasi (R)</th>
+                <th rowspan="2">Skor<br>Akhir (V)</th>
+                <th rowspan="2">Ket.</th>
+            </tr>
+            <tr>
+                <th>C1</th>
+                <th>C2</th>
+                <th>C3</th>
+                <th>R-C1</th>
+                <th>R-C2</th>
+                <th>R-C3</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for idx, item in enumerate(ranking) %}
+            <tr class="{% if idx == 0 %}kritis{% elif idx < 3 %}prioritas{% endif %}">
+                <td class="rank-col">{{ idx + 1 }}</td>
+                <td style="font-family: Courier, monospace; font-size: 9pt;">{{ item.asset.kode_aset }}</td>
+                <td>{{ item.asset.nama_aset }}</td>
+                <td>{{ item.asset.location.nama_lab }}</td>
+                <td class="center-col">{{ "%.1f"|format(item.c1_raw * 100) }}%</td>
+                <td class="center-col">{{ item.c2_raw | int }}/3</td>
+                <td class="num-col">Rp {{ "{:,.0f}".format(item.c3_raw) }}</td>
+                <td class="center-col">{{ item.r_c1 }}</td>
+                <td class="center-col">{{ item.r_c2 }}</td>
+                <td class="center-col">{{ item.r_c3 }}</td>
+                <td class="center-col"><strong>{{ item.skor_akhir }}</strong></td>
+                <td class="center-col">
+                    {% if idx == 0 %}<strong>★ Utama</strong>
+                    {% elif idx < 3 %}▲ Tinggi {% else %}—{% endif %} </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <p style="font-size: 10pt; color: #555;">
+        <em>Keterangan: C1 = Rasio Penyusutan Finansial/Straight Line (benefit, skala 0–100%),
+            C2 = Skor Kerusakan Fisik (benefit), C3 = Biaya Perawatan Historis (benefit).
+            Baris berwarna merah = prioritas utama, baris berwarna kuning = prioritas tinggi.</em>
+    </p>
+
+    <!-- Tanda Tangan -->
+    <div class="ttd-section">
+        <div class="ttd-box">
+            <p class="ttd-title">Bandung, {{ date.strftime('%d %B %Y') }}</p>
+            <p class="ttd-title">Kepala Laboratorium,</p>
+            <div class="ttd-space"></div>
+            {% if kepala_lab %}
+            <p class="ttd-name">{{ kepala_lab.nama }}</p>
+            <p class="ttd-nik">NIK: {{ kepala_lab.nik }}</p>
+            {% else %}
+            <p class="ttd-name">________________________</p>
+            <p class="ttd-nik">NIK: ___________________</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="no-print" style="text-align: center; margin-top: 30px;">
+        <button onclick="window.print()"
+            style="padding: 10px 25px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+            🖨️ Cetak / Simpan PDF
+        </button>
+        <button onclick="window.close()"
+            style="padding: 10px 25px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; margin-left: 10px;">
+            ✕ Tutup
+        </button>
+    </div>
+
+    <script>
+        // Auto-print saat halaman dibuka (opsional, dinonaktifkan)
+        // window.onload = () => window.print();
+    </script>
+</body>
+
+</html>

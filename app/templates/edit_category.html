@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Kategori · Lab Asset Management{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto;">
+    <div class="page-heading">
+        <div>
+            <span class="eyebrow">Data Master</span>
+            <h1>Edit Kategori: {{ cat.nama_kategori }}</h1>
+            <p>Perbarui nama klasifikasi kategori aset.</p>
+        </div>
+        <div class="heading-actions">
+            <a href="{{ url_for('main.categories') }}" class="btn btn-outline">← Kembali</a>
+        </div>
+    </div>
+
+    <section class="panel">
+        <div class="panel-title">
+            <span>Detail Kategori</span>
+        </div>
+        <div class="panel-body">
+            <form method="POST">
+                <div style="margin-bottom: 20px;">
+                    <label class="field">
+                        <span>Nama Kategori Barang *</span>
+                        <input type="text" name="nama_kategori" value="{{ cat.nama_kategori }}" required>
+                    </label>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <a href="{{ url_for('main.categories') }}" class="btn btn-outline">Batal</a>
+                    <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+{% endblock %}

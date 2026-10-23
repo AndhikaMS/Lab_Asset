@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Data Program Studi · Lab Asset Management{% endblock %}
+
+{% block content %}
+<!-- Page Heading -->
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Data Master &amp; Referensi
+        </span>
+        <h1>Data Program Studi (Prodi)</h1>
+        <p>Pengelolaan unit akademik pengelola dan komponen penomoran kode aset prodi.</p>
+    </div>
+    <div class="heading-actions">
+        {% if has_permission('edit_master') %}
+        <button type="button" class="btn btn-primary" onclick="showAddForm()">
+            + Tambah Prodi
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Unified Master Navigation Tabs -->
+<div class="master-tabs" role="tablist">
+    <a href="{{ url_for('main.locations') }}" class="master-tab-btn">
+        <strong>🏢 Data Lokasi</strong>
+        <span>Ruangan Lab</span>
+    </a>
+    <a href="{{ url_for('main.categories') }}" class="master-tab-btn">
+        <strong>🏷️ Data Kategori</strong>
+        <span>Klasifikasi Barang</span>
+    </a>
+    <a href="{{ url_for('main.prodi') }}" class="master-tab-btn active">
+        <strong>🎓 Program Studi</strong>
+        <span>{{ prodi_list|length }} Unit Akademik</span>
+    </a>
+    <a href="{{ url_for('main.kepala_lab') }}" class="master-tab-btn">
+        <strong>👤 Kepala Lab</strong>
+        <span>Pejabat &amp; Periode</span>
+    </a>
+</div>
+
+<!-- Inline Editor Panel -->
+{% if has_permission('edit_master') %}
+<div id="prodiEditorPanel" class="panel" style="display: none; border-color: var(--primary-border); box-shadow: 0 4px 16px var(--primary-glow);">
+    <div class="panel-title" style="background: var(--primary-light); color: var(--primary);">
+        <span id="formTitle">Tambah Program Studi Baru</span>
+        <button type="button" onclick="cancelEdit()" class="icon-btn" style="width: 28px; height: 28px;">&times;</button>
+    </div>
+    <div class="panel-body">
+        <form id="prodiForm" method="POST" action="{{ url_for('main.tambah_prodi') }}">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                <label class="field">
+                    <span>Kode Prodi *</span>
+                    <input type="text" name="kode_prodi" id="kode_prodi" required placeholder="Contoh: IF, SI, TI">
+                </label>
+                <label class="field" style="grid-column: span 1.5;">
+                    <span>Nama Program Studi *</span>
+                    <input type="text" name="nama_prodi" id="nama_prodi" required placeholder="Contoh: Teknik Informatika">
+                </label>
+                <label class="field">
+                    <span>Kode Aset (2 Digit Angka) *</span>
+                    <input type="text" name="kode_aset" id="kode_aset" required placeholder="Contoh: 01, 02, 03">
+                </label>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-outline" onclick="cancelEdit()">Batal</button>
+                <button type="submit" id="btnSubmit" class="btn btn-primary">Simpan Program Studi</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- Prodi Table Container -->
+<div class="table-container">
+    <div class="table-scroll">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th style="width: 140px;">Kode Prodi</th>
+                    <th>Nama Program Studi</th>
+                    <th>Kode Aset (Angka)</th>
+                    <th>Jumlah Aset Terhubung</th>
+                    {% if has_permission('edit_master') %}
+                    <th style="text-align: right; width: 140px;">Aksi</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in prodi_list %}
+                <tr>
+                    <td>
+                        <span class="badge badge-info" style="font-family: var(--font-mono); font-size: 12px;">
+                            {{ p.kode_prodi }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="asset-identity">
+                            <div class="asset-thumb">🎓</div>
+                            <div>
+                                <strong style="font-size: 14px; color: var(--slate-900);">{{ p.nama_prodi }}</strong>
+                                <small style="color: var(--slate-500);">Fakultas / Program Studi</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span style="font-family: var(--font-mono); font-weight: 700; color: var(--primary);">
+                            {{ p.kode_aset }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge badge-neutral">
+                            {{ p.assets|length }} Aset Terkait
+                        </span>
+                    </td>
+                    {% if has_permission('edit_master') %}
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 6px;">
+                            <button type="button" class="icon-btn" title="Edit Prodi" onclick="editProdi({{ p.id }}, '{{ p.kode_prodi }}', '{{ p.nama_prodi }}', '{{ p.kode_aset }}')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="m14.5 7.5 3 3"/></svg>
+                            </button>
+                            <a href="{{ url_for('main.delete_prodi', id=p.id) }}" class="icon-btn danger" title="Hapus Prodi" onclick="return confirm('Apakah Anda yakin ingin menghapus data prodi ini?')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>
+                            </a>
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 40px; color: var(--slate-400);">Belum ada data program studi.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showAddForm() {
+    const p = document.getElementById('prodiEditorPanel');
+    if (!p) return;
+    p.style.display = 'block';
+    document.getElementById('formTitle').innerText = 'Tambah Program Studi Baru';
+    document.getElementById('prodiForm').action = "{{ url_for('main.tambah_prodi') }}";
+    document.getElementById('kode_prodi').value = '';
+    document.getElementById('nama_prodi').value = '';
+    document.getElementById('kode_aset').value = '';
+    document.getElementById('btnSubmit').innerText = 'Simpan Program Studi';
+    p.scrollIntoView({ behavior: 'smooth' });
+}
+
+function editProdi(id, kode, nama, kodeAset) {
+    const p = document.getElementById('prodiEditorPanel');
+    if (!p) return;
+    p.style.display = 'block';
+    document.getElementById('formTitle').innerText = 'Edit Program Studi: ' + nama;
+    document.getElementById('prodiForm').action = "/prodi/edit/" + id;
+    document.getElementById('kode_prodi').value = kode;
+    document.getElementById('nama_prodi').value = nama;
+    document.getElementById('kode_aset').value = kodeAset;
+    document.getElementById('btnSubmit').innerText = 'Simpan Perubahan';
+    p.scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelEdit() {
+    const p = document.getElementById('prodiEditorPanel');
+    if (p) p.style.display = 'none';
+}
+</script>
+{% endblock %}

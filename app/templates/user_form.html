@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+
+{% block title %}{% if action == 'add' %}Tambah Pengguna{% else %}Edit Pengguna: {{ user.username }}{% endif %} · Lab Asset Management{% endblock %}
+
+{% block head_extra %}
+<style>
+.perm-group-card {
+    background: var(--white);
+    border: 1px solid var(--slate-200);
+    border-radius: var(--radius-md);
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+.perm-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 18px;
+    background: var(--slate-50);
+    border-bottom: 1px solid var(--slate-200);
+}
+.perm-group-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.perm-group-icon {
+    font-size: 18px;
+}
+.perm-group-title h3 {
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--slate-800);
+}
+.perm-group-title p {
+    margin: 0;
+    font-size: 11.5px;
+    color: var(--slate-500);
+}
+.perm-group-body {
+    padding: 14px 18px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+}
+.perm-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    background: var(--white);
+    border: 1.5px solid var(--slate-200);
+    transition: all 0.15s ease-in-out;
+    user-select: none;
+}
+.perm-card:hover {
+    border-color: var(--primary-border);
+    background: #faf5ff;
+}
+.perm-card.active {
+    border-color: #6366f1;
+    background: #f5f3ff;
+    box-shadow: 0 2px 6px rgba(99, 102, 241, 0.08);
+}
+.perm-card input[type="checkbox"] {
+    margin-top: 2px;
+    width: 17px;
+    height: 17px;
+    accent-color: #6366f1;
+    cursor: pointer;
+}
+.perm-card-content {
+    flex: 1;
+}
+.perm-card-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
+}
+.perm-card-desc {
+    font-size: 12px;
+    color: var(--slate-600);
+    line-height: 1.35;
+    margin: 0 0 6px;
+}
+.perm-card-key {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    background: var(--slate-100);
+    color: var(--slate-600);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+}
+.perm-card.active .perm-card-key {
+    background: #ede9fe;
+    color: #4f46e5;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 960px; margin: 0 auto;">
+    <!-- Page Heading -->
+    <div class="page-heading">
+        <div>
+            <span class="eyebrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="8" r="4"/><path d="M4 21c.7-5 3.4-7 8-7s7.3 2 8 7"/></svg>
+                Manajemen Akun &amp; Otorisasi
+            </span>
+            <h1>{% if action == 'add' %}Tambah Pengguna Baru{% else %}Edit Hak Akses: {{ user.username }}{% endif %}</h1>
+            <p>Atur kredensial akun, template peran struktural, dan konfigurasi izin granular modul sistem.</p>
+        </div>
+        <div class="heading-actions">
+            <a href="{{ url_for('main.users') }}" class="btn btn-outline">← Kembali ke Daftar</a>
+        </div>
+    </div>
+
+    <form method="POST" id="userForm">
+        <!-- Account Info Panel -->
+        <section class="panel" style="margin-bottom: 24px;">
+            <div class="panel-title">
+                <span>Informasi Akun &amp; Kredensial Login</span>
+            </div>
+            <div class="panel-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px;">
+                    <label class="field">
+                        <span>Username Akun *</span>
+                        <input type="text" name="username" value="{{ user.username if user else '' }}" {% if action == 'edit' %}readonly style="background: var(--slate-100); cursor: not-allowed;"{% else %}required{% endif %} placeholder="Contoh: andhika_lab">
+                        <small style="color: var(--slate-500); font-size: 11px;">Username unik untuk login ke sistem.</small>
+                    </label>
+                    <label class="field">
+                        <span>Password {% if action == 'edit' %}<small style="font-weight: 500; color: var(--slate-400);">(Kosongkan jika tidak diganti)</small>{% else %}*{% endif %}</span>
+                        <input type="password" name="password" {% if action == 'add' %}required{% endif %} placeholder="••••••••">
+                        <small style="color: var(--slate-500); font-size: 11px;">Minimal 6 karakter alfanumerik.</small>
+                    </label>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; margin-bottom: 18px;">
+                    <label class="field">
+                        <span>Nama Lengkap &amp; Gelar</span>
+                        <input type="text" name="nama_lengkap" value="{{ user.nama_lengkap if user else '' }}" placeholder="Contoh: Dr. Eng. Andhika Pratama, S.T., M.T.">
+                    </label>
+                    <label class="field">
+                        <span>Jabatan Struktural</span>
+                        <input type="text" name="jabatan" id="jabatanInput" value="{{ user.jabatan if user else '' }}" placeholder="Contoh: Kepala Laboratorium, Asisten, Dekan">
+                    </label>
+                </div>
+
+                <!-- Role Preset Selection -->
+                <div style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: var(--radius-md); padding: 16px 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <strong style="font-size: 13.5px; color: var(--slate-900); display: block; margin-bottom: 2px;">
+                                Template Peran Akses (Role Preset)
+                            </strong>
+                            <span style="font-size: 12px; color: var(--slate-500);">
+                                Memilih peran akan secara otomatis mencentang hak akses modul di bawah sesuai tugas struktural:
+                            </span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            {% set current_role = user.role if user else 'Super Admin' %}
+                            <select name="role" id="roleSelect" onchange="applyPreset(this.value)" style="padding: 9px 16px; font-weight: 700; font-size: 13.5px; border-radius: var(--radius-md); border: 1.5px solid var(--slate-300);">
+                                {% for r in ['Super Admin', 'Ketua Yayasan', 'Rektor', 'Dekan', 'Kepala Lab', 'Asisten Lab', 'Custom'] %}
+                                <option value="{{ r }}" {% if (current_role == r) or (r == 'Super Admin' and current_role == 'admin') %}selected{% endif %}>{{ r }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Permissions Panel -->
+        <section class="panel" style="margin-bottom: 30px;">
+            <div class="panel-title" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span>Konfigurasi Izin Granular Modul</span>
+                    <span id="activeCountBadge" class="badge badge-primary" style="font-size: 11.5px; font-weight: 700;">
+                        0 dari {{ all_permissions|length }} Modul Aktif
+                    </span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" onclick="selectAll(true)" class="btn btn-outline btn-sm">
+                        ✓ Centang Semua
+                    </button>
+                    <button type="button" onclick="selectAll(false)" class="btn btn-outline btn-sm">
+                        ✕ Hapus Semua
+                    </button>
+                </div>
+            </div>
+            <div class="panel-body">
+                <p style="margin: 0 0 20px; font-size: 12.5px; color: var(--slate-600); line-height: 1.5;">
+                    Hak akses ini mengontrol visibilitas menu navigasi, akses route URL, serta tombol tindakan (Tambah, Edit, Hapus, Cetak, Desain Denah, dsb.) secara granular.
+                </p>
+
+                <!-- Grouped Permissions -->
+                {% for group in permission_groups %}
+                <div class="perm-group-card">
+                    <div class="perm-group-header">
+                        <div class="perm-group-title">
+                            <span class="perm-group-icon">{{ group.icon }}</span>
+                            <div>
+                                <h3>{{ group.title }}</h3>
+                                <p>{{ group.description }}</p>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 6px;">
+                            <button type="button" class="btn btn-outline btn-sm" style="font-size: 11px; padding: 3px 8px;" onclick="toggleGroup('{{ group.id }}', true)">Pilih Semua</button>
+                            <button type="button" class="btn btn-outline btn-sm" style="font-size: 11px; padding: 3px 8px;" onclick="toggleGroup('{{ group.id }}', false)">Batal</button>
+                        </div>
+                    </div>
+                    <div class="perm-group-body" id="group-{{ group.id }}">
+                        {% for perm_key in group.permissions %}
+                        {% if perm_key in all_permissions %}
+                        {% set perm_desc = all_permissions[perm_key] %}
+                        {% set is_checked = (action == 'edit' and perm_key in user_perms) or (action == 'add' and perm_key in role_presets.get('Super Admin', [])) %}
+                        <label class="perm-card {% if is_checked %}active{% endif %}" onclick="handleCardClick(event, this)">
+                            <input type="checkbox" name="permissions" value="{{ perm_key }}" class="perm-checkbox group-{{ group.id }}-cb" {% if is_checked %}checked{% endif %} onchange="onCheckboxChanged()">
+                            <div class="perm-card-content">
+                                <div class="perm-card-title">
+                                    <span class="perm-card-key">{{ perm_key }}</span>
+                                </div>
+                                <p class="perm-card-desc">{{ perm_desc }}</p>
+                            </div>
+                        </label>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- Form Submission Footer Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 24px; background: var(--white); border: 1px solid var(--slate-200); border-radius: var(--radius-md); box-shadow: 0 4px 12px rgba(0,0,0,0.03); margin-bottom: 40px;">
+            <div style="font-size: 12.5px; color: var(--slate-500);">
+                💡 Perubahan izin akan langsung berlaku secara <strong>real-time</strong> pada sesi pengguna terkait.
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <a href="{{ url_for('main.users') }}" class="btn btn-outline">Batal</a>
+                <button type="submit" class="btn btn-primary" style="padding: 10px 22px;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Simpan Konfigurasi Akun
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const presets = {{ role_presets | tojson }};
+const totalPerms = {{ all_permissions|length }};
+
+function updateCardVisuals() {
+    let checkedCount = 0;
+    const checkboxes = document.querySelectorAll('.perm-checkbox');
+    checkboxes.forEach(cb => {
+        const card = cb.closest('.perm-card');
+        if (card) {
+            if (cb.checked) {
+                card.classList.add('active');
+                checkedCount++;
+            } else {
+                card.classList.remove('active');
+            }
+        }
+    });
+
+    const badge = document.getElementById('activeCountBadge');
+    if (badge) {
+        badge.innerText = `${checkedCount} dari ${totalPerms} Modul Aktif`;
+        if (checkedCount === totalPerms) {
+            badge.className = 'badge badge-success';
+        } else if (checkedCount === 0) {
+            badge.className = 'badge badge-danger';
+        } else {
+            badge.className = 'badge badge-primary';
+        }
+    }
+}
+
+function handleCardClick(event, card) {
+    // If click didn't land directly on the checkbox input, toggle it
+    if (event.target.tagName.toLowerCase() !== 'input') {
+        const cb = card.querySelector('.perm-checkbox');
+        if (cb) {
+            cb.checked = !cb.checked;
+            onCheckboxChanged();
+        }
+    }
+}
+
+function onCheckboxChanged() {
+    updateCardVisuals();
+    checkMatchingPreset();
+}
+
+function checkMatchingPreset() {
+    const checked = Array.from(document.querySelectorAll('.perm-checkbox:checked')).map(cb => cb.value).sort();
+    const roleSelect = document.getElementById('roleSelect');
+    if (!roleSelect) return;
+
+    let matchedRole = 'Custom';
+
+    for (const [roleName, allowedList] of Object.entries(presets)) {
+        const sortedAllowed = [...allowedList].sort();
+        if (checked.length === sortedAllowed.length && checked.every((val, idx) => val === sortedAllowed[idx])) {
+            matchedRole = roleName;
+            break;
+        }
+    }
+
+    // Set select value without triggering onchange
+    roleSelect.value = matchedRole;
+}
+
+function applyPreset(roleName) {
+    const checkboxes = document.querySelectorAll('.perm-checkbox');
+    
+    if (roleName === 'Super Admin') {
+        checkboxes.forEach(cb => cb.checked = true);
+    } else if (presets[roleName]) {
+        const allowed = presets[roleName];
+        checkboxes.forEach(cb => {
+            cb.checked = allowed.includes(cb.value);
+        });
+    }
+    // If 'Custom' selected, keep current selection
+
+    const jabatanInput = document.getElementById('jabatanInput');
+    if (jabatanInput && (!jabatanInput.value || Object.keys(presets).includes(jabatanInput.value))) {
+        if (roleName !== 'Custom') {
+            jabatanInput.value = roleName;
+        }
+    }
+
+    updateCardVisuals();
+}
+
+function selectAll(val) {
+    document.querySelectorAll('.perm-checkbox').forEach(cb => cb.checked = val);
+    updateCardVisuals();
+    checkMatchingPreset();
+}
+
+function toggleGroup(groupId, state) {
+    document.querySelectorAll(`.group-${groupId}-cb`).forEach(cb => cb.checked = state);
+    updateCardVisuals();
+    checkMatchingPreset();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    updateCardVisuals();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Inventaris {{ location.nama_lab }}</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid black;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        h1,
+        h2 {
+            margin: 5px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+
+        th,
+        td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+            font-size: 12px;
+        }
+
+        th {
+            background-color: #f0f0f0;
+            text-align: center;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .qr-cell img {
+            width: 60px;
+            height: 60px;
+        }
+
+        .footer {
+            margin-top: 50px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .sign-area {
+            text-align: left;
+            min-width: 250px;
+        }
+
+        .sign-space {
+            height: 80px;
+        }
+
+        @media print {
+            .no-print {
+                display: none;
+            }
+
+            @page {
+                size: auto;
+                margin: 1cm;
+            }
+        }
+    </style>
+</head>
+
+<body onload="window.print()">
+    <div class="header">
+        <h1>LAPORAN DATA ASET</h1>
+        <h2>{{ location.nama_lab }}</h2>
+        <p>Tanggal Cetak: {{ date.strftime('%d %B %Y') }}</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th width="3%">No</th>
+                <th width="15%">Kode Aset</th>
+                <th width="20%">Nama Aset</th>
+                <th width="8%">Tahun Perolehan</th>
+                <th width="10%">Kategori</th>
+                <th width="20%">Deskripsi</th>
+                <th width="10%">Kondisi</th>
+                <th width="10%">Foto Fisik</th>
+                <th width="10%">QR Code</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for asset in assets %}
+            <tr>
+                <td class="center">{{ loop.index }}</td>
+                <td style="font-family: monospace; font-size: 10px;">{{ asset.kode_aset }}</td>
+                <td>{{ asset.nama_aset }}</td>
+                <td class="center">{{ asset.tahun_pengadaan }}</td>
+                <td>{{ asset.category.nama_kategori }}</td>
+                <td>{{ asset.deskripsi }}</td>
+                <td class="center">{{ asset.kondisi }}</td>
+                <td class="center">
+                    {% if asset.foto_path %}
+                    <img src="{{ url_for('static', filename=asset.foto_path) }}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #999;">
+                    {% else %}
+                    <span style="font-size: 10px; color: #777;">-</span>
+                    {% endif %}
+                </td>
+                <td class="qr-cell center">
+                    {% if asset.qr_code_path %}
+                    <img src="{{ url_for('static', filename=asset.qr_code_path) }}">
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="9" style="text-align:center">Data Kosong</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <div class="sign-area">
+            Bandung, {{ date.strftime('%d %B %Y') }}<br>
+            Kepala Lab. Komputer,
+            <div class="sign-space"></div>
+            <strong>
+                {% if kepala_lab %}
+                {{ kepala_lab.nama }}
+                {% else %}
+                ( ................................. )
+                {% endif %}
+            </strong><br>
+            NIK. {% if kepala_lab %}{{ kepala_lab.nik }}{% else %}........................{% endif %}
+        </div>
+    </div>
+</body>
+
+</html>

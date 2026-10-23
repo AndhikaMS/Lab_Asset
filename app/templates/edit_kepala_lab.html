@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Kepala Lab · Lab Asset Management{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <div class="page-heading">
+        <div>
+            <span class="eyebrow">Data Master</span>
+            <h1>Edit Kepala Lab: {{ kepala.nama }}</h1>
+            <p>Perbarui informasi pejabat pimpinan laboratorium.</p>
+        </div>
+        <div class="heading-actions">
+            <a href="{{ url_for('main.kepala_lab') }}" class="btn btn-outline">← Kembali</a>
+        </div>
+    </div>
+
+    <section class="panel">
+        <div class="panel-title">
+            <span>Detail Pejabat Kepala Lab</span>
+        </div>
+        <div class="panel-body">
+            <form method="POST">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 18px;">
+                    <label class="field">
+                        <span>NIK / NIDN *</span>
+                        <input type="text" name="nik" value="{{ kepala.nik }}" required>
+                    </label>
+                    <label class="field" style="grid-column: span 1.5;">
+                        <span>Nama Lengkap &amp; Gelar *</span>
+                        <input type="text" name="nama" value="{{ kepala.nama }}" required>
+                    </label>
+                    <label class="field">
+                        <span>Periode Masa Jabatan *</span>
+                        <input type="text" name="periode" value="{{ kepala.periode }}" required>
+                    </label>
+                </div>
+
+                <div style="margin-bottom: 24px; padding: 12px 16px; background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: var(--radius-md);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" name="is_active" id="is_active" style="width: 18px; height: 18px;" {% if kepala.is_active %}checked{% endif %}>
+                        <strong style="color: var(--emerald-600); font-size: 13.5px;">Tetapkan Sebagai Pimpinan Aktif Saat Ini</strong>
+                    </label>
+                    <small style="display: block; color: var(--slate-500); margin-top: 4px; padding-left: 26px;">
+                        Status ini menentukan nama pimpinan penandatangan pada dokumen laporan resmi.
+                    </small>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <a href="{{ url_for('main.kepala_lab') }}" class="btn btn-outline">Batal</a>
+                    <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+{% endblock %}

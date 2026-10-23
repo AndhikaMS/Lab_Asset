@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Program Studi · Lab Asset Management{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <div class="page-heading">
+        <div>
+            <span class="eyebrow">Data Master</span>
+            <h1>Edit Program Studi: {{ prodi.nama_prodi }}</h1>
+            <p>Perbarui identitas prodi dan penomoran kode aset.</p>
+        </div>
+        <div class="heading-actions">
+            <a href="{{ url_for('main.prodi') }}" class="btn btn-outline">← Kembali</a>
+        </div>
+    </div>
+
+    <section class="panel">
+        <div class="panel-title">
+            <span>Detail Program Studi</span>
+        </div>
+        <div class="panel-body">
+            <form method="POST">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                    <label class="field">
+                        <span>Kode Prodi *</span>
+                        <input type="text" name="kode_prodi" value="{{ prodi.kode_prodi }}" required>
+                    </label>
+                    <label class="field" style="grid-column: span 1.5;">
+                        <span>Nama Program Studi *</span>
+                        <input type="text" name="nama_prodi" value="{{ prodi.nama_prodi }}" required>
+                    </label>
+                    <label class="field">
+                        <span>Kode Aset (2 Digit Angka) *</span>
+                        <input type="text" name="kode_aset" value="{{ prodi.kode_aset }}" required>
+                    </label>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <a href="{{ url_for('main.prodi') }}" class="btn btn-outline">Batal</a>
+                    <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+{% endblock %}

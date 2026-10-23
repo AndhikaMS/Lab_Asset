@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Tambah Asisten Lab. Komputer</h1>
+
+<div class="card">
+    <form method="POST">
+        <div class="form-group">
+            <label>Kode Asisten</label>
+            <input type="text" name="kode_asisten" required>
+        </div>
+        <div class="form-group">
+            <label>Nama</label>
+            <input type="text" name="nama" required>
+        </div>
+        <button type="submit" class="btn">Simpan</button>
+        <a href="{{ url_for('main.asisten_lab') }}" class="btn" style="background: #6c757d;">Batal</a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}Prioritas Penggantian Aset Lab · Lab Asset Management{% endblock %}
+
+{% block content %}
+<!-- Page Heading -->
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
+            Analisis Kelayakan Aset
+        </span>
+        <h1>Prioritas Penggantian Aset Lab</h1>
+        <p>Analisis dan pemeringkatan unit komputer yang memerlukan peremajaan berdasarkan usia pakai, skor kerusakan, dan biaya perawatan.</p>
+    </div>
+    <div class="heading-actions">
+        <!-- Live Weight Total Validator Pill -->
+        {% set total_b = (bobot.bobot_c1 or 0) + (bobot.bobot_c2 or 0) + (bobot.bobot_c3 or 0) %}
+        {% set is_valid_weight = (total_b >= 0.999 and total_b <= 1.001) %}
+        <div id="weightTotalPill" class="saw-status-badge {% if is_valid_weight %}valid{% else %}invalid{% endif %}">
+            <span>Total Bobot:</span>
+            <strong id="weightTotalVal">{{ "%.2f"|format(total_b) }}</strong>
+            <small id="weightTotalStatus">{% if is_valid_weight %}(Valid 100%){% else %}(Harus = 1.00){% endif %}</small>
+        </div>
+
+        {% if has_permission('print_reports') %}
+        <a href="{{ url_for('main.spk_print', kategori_id=selected_kat_id or '', location_id=selected_loc_id or '') }}" target="_blank" class="btn btn-cyan">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Cetak Rekomendasi Penggantian
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Controls & Scope Filter (Matching Wireframe saw-controls) -->
+<section class="panel">
+    <div class="panel-title">
+        <span>Filter Cakupan Aset &amp; Bobot Kriteria</span>
+        <span class="badge badge-neutral">{{ ranking|length }} Aset Masuk Pemeringkatan</span>
+    </div>
+    <div class="panel-body">
+        <!-- Row 1: Filter Scope -->
+        <form method="GET" action="{{ url_for('main.spk') }}" id="spkFilterForm" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 16px; align-items: flex-end; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--slate-100);">
+            <label class="field">
+                <span>Filter Kategori Aset</span>
+                <select name="kategori_id" onchange="this.form.submit()">
+                    <option value="">Semua Kategori (Bobot Umum)</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if selected_kat_id == cat.id %}selected{% endif %}>
+                        {{ cat.nama_kategori }} {% if cat.id in bobot_per_kat %}★{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label class="field">
+                <span>Filter Lokasi Laboratorium</span>
+                <select name="location_id" onchange="this.form.submit()">
+                    <option value="">Semua Ruangan Lab</option>
+                    {% for loc in locations %}
+                    <option value="{{ loc.id }}" {% if selected_loc_id == loc.id %}selected{% endif %}>
+                        {{ loc.nama_lab }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <div>
+                <a href="{{ url_for('main.spk') }}" class="btn btn-outline">Reset Filter</a>
+            </div>
+        </form>
+
+        <!-- Row 2: Weight Configuration Inputs -->
+        {% if has_permission('edit_spk_bobot') %}
+        <form method="POST" action="{{ url_for('main.spk_update_bobot') }}" id="formBobot">
+            <input type="hidden" name="kategori_id" value="{{ selected_kat_id or '' }}">
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div>
+                    <strong style="font-size: 14px; color: var(--slate-900);">Bobot Kriteria Penilaian</strong>
+                    <span style="display: block; font-size: 12px; color: var(--slate-500);">Tentukan kontribusi proporsi dari masing-masing kriteria (total C1 + C2 + C3 harus = 1.00).</span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        Simpan Bobot
+                    </button>
+                </div>
+            </div>
+
+            <div class="saw-criteria-grid">
+                <!-- C1 -->
+                <div class="saw-criterion-card">
+                    <span><b>C1</b> · Sisa Umur Ekonomis (Cost)</span>
+                    <input type="number" id="inputC1" name="bobot_c1" step="0.01" min="0" max="1" required value="{{ bobot.bobot_c1 }}" oninput="calcWeights()">
+                    <small style="display: block; text-align: center; color: var(--slate-400); margin-top: 6px;">Semakin kecil sisa umur, semakin kritis</small>
+                </div>
+
+                <!-- C2 -->
+                <div class="saw-criterion-card">
+                    <span><b>C2</b> · Tingkat Kerusakan Fisik (Benefit)</span>
+                    <input type="number" id="inputC2" name="bobot_c2" step="0.01" min="0" max="1" required value="{{ bobot.bobot_c2 }}" oninput="calcWeights()">
+                    <small style="display: block; text-align: center; color: var(--slate-400); margin-top: 6px;">Skala 1 (Baik) s/d 3 (Rusak Berat)</small>
+                </div>
+
+                <!-- C3 -->
+                <div class="saw-criterion-card">
+                    <span><b>C3</b> · Biaya Perawatan Historis (Benefit)</span>
+                    <input type="number" id="inputC3" name="bobot_c3" step="0.01" min="0" max="1" required value="{{ bobot.bobot_c3 }}" oninput="calcWeights()">
+                    <small style="display: block; text-align: center; color: var(--slate-400); margin-top: 6px;">Akumulasi biaya servis terdahulu</small>
+                </div>
+            </div>
+        </form>
+        {% else %}
+        <!-- Read-only view for non-admin -->
+        <div class="saw-criteria-grid">
+            <div class="saw-criterion-card">
+                <span><b>C1</b> · Sisa Umur Ekonomis (Cost)</span>
+                <div style="font-size: 20px; font-weight: 800; color: var(--primary); text-align: center;">{{ bobot.bobot_c1 }}</div>
+            </div>
+            <div class="saw-criterion-card">
+                <span><b>C2</b> · Tingkat Kerusakan Fisik (Benefit)</span>
+                <div style="font-size: 20px; font-weight: 800; color: var(--primary); text-align: center;">{{ bobot.bobot_c2 }}</div>
+            </div>
+            <div class="saw-criterion-card">
+                <span><b>C3</b> · Biaya Perawatan Historis (Benefit)</span>
+                <div style="font-size: 20px; font-weight: 800; color: var(--primary); text-align: center;">{{ bobot.bobot_c3 }}</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- Ranking Priority List Table (Matching Wireframe saw-table) -->
+<div class="table-container">
+    <div style="padding: 16px 22px; background: linear-gradient(to right, #fafbfc, var(--white)); border-bottom: 1px solid var(--slate-100); display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <span class="eyebrow" style="margin-bottom: 2px;">Daftar Prioritas</span>
+            <strong style="display: block; font-size: 15px; color: var(--slate-900);">Urutan Rekomendasi Tindakan Aset Paling Kritis</strong>
+        </div>
+        <span style="font-size: 12px; color: var(--slate-500);">Skor tertinggi berada di peringkat teratas (Rank #01)</span>
+    </div>
+
+    <div class="table-scroll">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th style="width: 60px; text-align: center;">Rank</th>
+                    <th>Identitas Aset</th>
+                    <th>Kode Inventaris</th>
+                    <th>Kategori &amp; Lokasi</th>
+                    <th>C1 (Sisa Umur)</th>
+                    <th>C2 (Kerusakan)</th>
+                    <th>C3 (Biaya Servis)</th>
+                    <th>Normalisasi (R-C2, R-C3)</th>
+                    <th style="width: 140px;">Skor Prioritas Akhir</th>
+                    <th style="text-align: right;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in ranking %}
+                <tr>
+                    <td style="text-align: center;">
+                        <span class="saw-rank-pill {% if loop.index == 1 %}top-1{% elif loop.index == 2 %}top-2{% elif loop.index == 3 %}top-3{% endif %}">
+                            {{ "%02d"|format(loop.index) }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="asset-identity">
+                            <div class="asset-thumb {% if item.asset.kondisi == 'Rusak Berat' %}danger{% elif 'PC' in item.asset.nama_aset %}desktop{% else %}network{% endif %}">
+                                {% if 'PC' in item.asset.nama_aset %}💻{% elif 'Monitor' in item.asset.nama_aset %}🖥️{% else %}📦{% endif %}
+                            </div>
+                            <div class="asset-identity-text">
+                                <a href="{{ url_for('main.detail_asset', id=item.asset.id) }}" style="font-weight: 700; color: var(--slate-900);" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--slate-900)'">
+                                    {{ item.asset.nama_aset }}
+                                </a>
+                                <small>{{ item.asset.category.nama_kategori if item.asset.category else '-' }}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--slate-800);">
+                            {{ item.asset.kode_aset }}
+                        </span>
+                    </td>
+                    <td>
+                        <strong style="display: block; font-size: 13px; color: var(--slate-900);">{{ item.asset.location.nama_lab if item.asset.location else '-' }}</strong>
+                        <small style="color: var(--slate-500);">{{ item.asset.prodi.nama_prodi if item.asset.prodi else '-' }}</small>
+                    </td>
+                    <td>
+                        <strong>{{ item.asset.sisa_umur_ekonomis() }}</strong> <small style="color: var(--slate-500);">thn</small>
+                    </td>
+                    <td>
+                        <span class="badge {% if item.asset.kondisi == 'Baik' %}badge-success{% elif item.asset.kondisi == 'Rusak Berat' %}badge-danger{% else %}badge-warning{% endif %}">
+                            {{ item.c2_raw|int }} · {{ item.asset.kondisi }}
+                        </span>
+                    </td>
+                    <td>
+                        <span style="font-weight: 700; color: var(--slate-800);">
+                            Rp {{ "{:,.0f}".format(item.c3_raw).replace(',', '.') }}
+                        </span>
+                    </td>
+                    <td>
+                        <div style="font-size: 11px; color: var(--slate-500); font-family: var(--font-mono);">
+                            R-C1: <b>{{ "%.2f"|format(item.r_c1) }}</b> · R-C2: <b>{{ "%.2f"|format(item.r_c2) }}</b> · R-C3: <b>{{ "%.2f"|format(item.r_c3) }}</b>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="saw-score-progress" style="width: 120px;">
+                            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                                <strong style="color: var(--primary); font-size: 15px;">{{ "%.3f"|format(item.skor_akhir) }}</strong>
+                                <span style="font-size: 11px; font-weight: 700; color: var(--slate-500);">{{ (item.skor_akhir * 100)|int }}%</span>
+                            </div>
+                            <div class="saw-score-progress-bar">
+                                <div class="saw-score-progress-fill" style="width: {{ (item.skor_akhir * 100)|int }}%;"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td style="text-align: right;">
+                        <a href="{{ url_for('main.detail_asset', id=item.asset.id) }}" class="btn btn-outline btn-sm">
+                            Detail
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" style="text-align: center; padding: 48px; color: var(--slate-400);">
+                        <div style="font-size: 32px; margin-bottom: 8px;">📊</div>
+                        <strong style="display: block; font-size: 14px; color: var(--slate-700);">Tidak Ada Aset Memenuhi Kriteria</strong>
+                        <p style="margin: 0; font-size: 12.5px;">Coba pilih kategori atau lokasi lain untuk melihat kalkulasi prioritas penggantian.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function calcWeights() {
+    const c1 = parseFloat(document.getElementById('inputC1').value) || 0;
+    const c2 = parseFloat(document.getElementById('inputC2').value) || 0;
+    const c3 = parseFloat(document.getElementById('inputC3').value) || 0;
+    const total = c1 + c2 + c3;
+    
+    const pill = document.getElementById('weightTotalPill');
+    const valText = document.getElementById('weightTotalVal');
+    const statusText = document.getElementById('weightTotalStatus');
+    
+    valText.innerText = total.toFixed(2);
+    
+    if (Math.abs(total - 1.0) < 0.001) {
+        pill.className = 'saw-status-badge valid';
+        statusText.innerText = '(Valid 100%)';
+    } else {
+        pill.className = 'saw-status-badge invalid';
+        statusText.innerText = '(Harus = 1.00)';
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}Beranda · Lab Asset Management{% endblock %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Page Heading -->
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Ringkasan Eksekutif
+        </span>
+        <h1>Selamat Datang, {{ session.get('nama_lengkap') or session.get('username') }}</h1>
+        <p>Berikut adalah ringkasan performa dan portofolio aset laboratorium aktif saat ini.</p>
+    </div>
+</div>
+
+<!-- Home Grid: Charts & Portfolio Summaries -->
+<div class="home-grid">
+    <!-- Left Column: Distribusi Portofolio Aset -->
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+        <section class="panel">
+            <div class="panel-title">
+                <span>Distribusi Portofolio Aset</span>
+                <span class="badge badge-neutral">{{ total_categories }} Kategori</span>
+            </div>
+            <div class="panel-body">
+                <div class="donut-grid">
+                    <div class="donut-card">
+                        <h3>Berdasarkan Jumlah Unit</h3>
+                        <div style="width: 100%; height: 260px; position: relative;">
+                            <canvas id="chartUnitCategory"></canvas>
+                        </div>
+                    </div>
+                    <div class="donut-card">
+                        <h3>Berdasarkan Nilai Investasi (Rp)</h3>
+                        <div style="width: 100%; height: 260px; position: relative;">
+                            <canvas id="chartValueCategory"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Right Column: Summary & Feeds -->
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+        <!-- Executive Portfolio Summary List -->
+        <section class="panel">
+            <div class="panel-title">
+                <span>Ringkasan Portofolio Finansial</span>
+            </div>
+            <div class="panel-body">
+                <dl class="data-list">
+                    <div class="data-row">
+                        <dt>Total Aset Terdaftar</dt>
+                        <dd>{{ total_assets }} Unit</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Total Nilai Perolehan</dt>
+                        <dd>Rp {{ "{:,.0f}".format(total_investasi).replace(',', '.') }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Total Nilai Residu</dt>
+                        <dd>Rp {{ "{:,.0f}".format(total_residu).replace(',', '.') }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Total Nilai Buku Saat Ini</dt>
+                        <dd style="color: var(--emerald-600); font-weight: 700;">Rp {{ "{:,.0f}".format(total_nilai_buku).replace(',', '.') }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Total Biaya Pemeliharaan</dt>
+                        <dd style="color: var(--amber-600); font-weight: 700;">Rp {{ "{:,.0f}".format(total_biaya_perawatan).replace(',', '.') }}</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Rata-rata Umur Ekonomis</dt>
+                        <dd>{{ avg_useful_life }} Tahun</dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Aset Habis Umur Ekonomis</dt>
+                        <dd><span class="badge {% if overdue_assets > 0 %}badge-danger{% else %}badge-success{% endif %}">{{ overdue_assets }} Unit</span></dd>
+                    </div>
+                    <div class="data-row">
+                        <dt>Kondisi Aset Baik</dt>
+                        <dd><span class="badge badge-success">{{ "%.1f"|format(persentase_baik) }}%</span></dd>
+                    </div>
+                </dl>
+            </div>
+        </section>
+
+        <!-- Recent Assets List -->
+        <section class="panel">
+            <div class="panel-title">
+                <span>Aset Baru Ditambahkan</span>
+                <a href="{{ url_for('main.assets') }}" class="btn btn-outline btn-sm">Lihat Semua →</a>
+            </div>
+            <div class="panel-body" style="padding: 12px 18px;">
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    {% for asset in recent_assets %}
+                    <a href="{{ url_for('main.detail_asset', id=asset.id) }}" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: var(--radius-md); border: 1px solid var(--slate-100); background: var(--white); transition: all var(--transition-fast);" onmouseover="this.style.background='var(--slate-50)'; this.style.borderColor='var(--slate-300)';" onmouseout="this.style.background='var(--white)'; this.style.borderColor='var(--slate-100)';">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div class="asset-thumb">
+                                {% if 'PC' in asset.nama_aset %}💻{% elif 'Monitor' in asset.nama_aset %}🖥️{% else %}📦{% endif %}
+                            </div>
+                            <div>
+                                <strong style="display: block; font-size: 13.5px; color: var(--slate-900);">{{ asset.nama_aset }}</strong>
+                                <small style="color: var(--slate-500); font-size: 11.5px;">{{ asset.category.nama_kategori }} · {{ asset.location.nama_lab }}</small>
+                            </div>
+                        </div>
+                        <div style="color: var(--slate-400);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </div>
+                    </a>
+                    {% else %}
+                    <div style="text-align: center; padding: 20px; color: var(--slate-400); font-size: 13px;">Belum ada riwayat aset.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const labels = {{ kategori_labels | safe }};
+    const counts = {{ kategori_counts | safe }};
+    const values = {{ kategori_values | safe }};
+
+    const curatedColors = [
+        '#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#0ea5e9'
+    ];
+
+    // Donut 1: Counts
+    if (document.getElementById('chartUnitCategory') && labels.length > 0) {
+        new Chart(document.getElementById('chartUnitCategory'), {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: counts,
+                    backgroundColor: curatedColors,
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 10, font: { family: 'Plus Jakarta Sans', size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) { return ` ${ctx.label}: ${ctx.raw} unit`; }
+                        }
+                    }
+                },
+                cutout: '68%'
+            }
+        });
+    }
+
+    // Donut 2: Values
+    if (document.getElementById('chartValueCategory') && labels.length > 0) {
+        new Chart(document.getElementById('chartValueCategory'), {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: curatedColors,
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 10, font: { family: 'Plus Jakarta Sans', size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return ` ${ctx.label}: Rp ${Number(ctx.raw).toLocaleString('id-ID')}`;
+                            }
+                        }
+                    }
+                },
+                cutout: '68%'
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

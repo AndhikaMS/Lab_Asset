@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Log Perbaikan · Lab Asset Management{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <div class="page-heading">
+        <div>
+            <span class="eyebrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="m14.5 7.5 3 3"/></svg>
+                Perbarui Servis
+            </span>
+            <h1>Edit Data Perbaikan</h1>
+            <p>Perbarui catatan perbaikan. Biaya perawatan aset akan dihitung ulang secara otomatis.</p>
+        </div>
+        <div class="heading-actions">
+            <a href="{{ url_for('main.perbaikan') }}" class="btn btn-outline">← Kembali</a>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('main.edit_perbaikan', id=p.id) }}">
+        <section class="panel">
+            <div class="panel-title">
+                <span>Informasi Servis</span>
+            </div>
+            <div class="panel-body">
+                <div style="margin-bottom: 18px;">
+                    <label class="field">
+                        <span>Pilih Perangkat / Aset *</span>
+                        <select name="asset_id" required>
+                            {% for a in semua_aset %}
+                            <option value="{{ a.id }}" {% if a.id == p.asset_id %}selected{% endif %}>
+                                {{ a.nama_aset }} ({{ a.kode_aset }}) · {{ a.location.nama_lab if a.location else '-' }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px;">
+                    <label class="field">
+                        <span>Tanggal Tindakan *</span>
+                        <input type="date" name="tanggal_perbaikan" required value="{{ p.tanggal_perbaikan.strftime('%Y-%m-%d') }}">
+                    </label>
+                    <label class="field">
+                        <span>Biaya Servis / Suku Cadang (Rp) *</span>
+                        <input type="number" name="biaya_perbaikan" min="0" step="1000" required value="{{ p.biaya_perbaikan }}">
+                    </label>
+                </div>
+
+                <label class="field" style="margin-bottom: 24px;">
+                    <span>Uraian / Deskripsi Penanganan Kerusakan *</span>
+                    <textarea name="deskripsi" required>{{ p.deskripsi }}</textarea>
+                </label>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <a href="{{ url_for('main.perbaikan') }}" class="btn btn-outline">Batal</a>
+                    <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                </div>
+            </div>
+        </section>
+    </form>
+</div>
+{% endblock %}

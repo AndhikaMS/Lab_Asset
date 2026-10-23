@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Data Kategori Aset · Lab Asset Management{% endblock %}
+
+{% block content %}
+<!-- Page Heading -->
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Data Master &amp; Referensi
+        </span>
+        <h1>Data Kategori Aset</h1>
+        <p>Klasifikasi kelompok inventaris laboratorium untuk pelaporan dan analisis prioritas penggantian.</p>
+    </div>
+    <div class="heading-actions">
+        {% if has_permission('edit_master') %}
+        <button type="button" class="btn btn-primary" onclick="showAddForm()">
+            + Tambah Kategori
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Unified Master Navigation Tabs -->
+<div class="master-tabs" role="tablist">
+    <a href="{{ url_for('main.locations') }}" class="master-tab-btn">
+        <strong>🏢 Data Lokasi</strong>
+        <span>Ruangan Lab</span>
+    </a>
+    <a href="{{ url_for('main.categories') }}" class="master-tab-btn active">
+        <strong>🏷️ Data Kategori</strong>
+        <span>{{ categories|length }} Kelompok Barang</span>
+    </a>
+    <a href="{{ url_for('main.prodi') }}" class="master-tab-btn">
+        <strong>🎓 Program Studi</strong>
+        <span>Akademik Pengelola</span>
+    </a>
+    <a href="{{ url_for('main.kepala_lab') }}" class="master-tab-btn">
+        <strong>👤 Kepala Lab</strong>
+        <span>Pejabat &amp; Periode</span>
+    </a>
+</div>
+
+<!-- Inline Editor Panel -->
+{% if has_permission('edit_master') %}
+<div id="categoryEditorPanel" class="panel" style="display: none; border-color: var(--primary-border); box-shadow: 0 4px 16px var(--primary-glow);">
+    <div class="panel-title" style="background: var(--primary-light); color: var(--primary);">
+        <span id="formTitle">Tambah Kategori Baru</span>
+        <button type="button" onclick="cancelEdit()" class="icon-btn" style="width: 28px; height: 28px;">&times;</button>
+    </div>
+    <div class="panel-body">
+        <form id="categoryForm" method="POST" action="{{ url_for('main.tambah_kategori') }}">
+            <div style="margin-bottom: 16px; max-width: 480px;">
+                <label class="field">
+                    <span>Nama Kategori Barang *</span>
+                    <input type="text" name="nama_kategori" id="nama_kategori" required placeholder="Contoh: Komputer Desktop, Perangkat Jaringan, dll.">
+                </label>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn btn-outline" onclick="cancelEdit()">Batal</button>
+                <button type="submit" id="btnSubmit" class="btn btn-primary">Simpan Kategori</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- Categories Table Container -->
+<div class="table-container">
+    <div class="table-scroll">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th style="width: 80px;">No</th>
+                    <th>Nama Kategori Barang</th>
+                    <th>Jumlah Aset Terdaftar</th>
+                    {% if has_permission('edit_master') %}
+                    <th style="text-align: right; width: 140px;">Aksi</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for cat in categories %}
+                <tr>
+                    <td>
+                        <span style="font-family: var(--font-mono); font-weight: 700; color: var(--slate-500);">
+                            #{{ "%02d"|format(loop.index) }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="asset-identity">
+                            <div class="asset-thumb">🏷️</div>
+                            <div>
+                                <strong style="font-size: 14px; color: var(--slate-900);">{{ cat.nama_kategori }}</strong>
+                                <small style="color: var(--slate-500);">Klasifikasi Inventaris</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge badge-neutral">
+                            {{ cat.assets|length }} Aset Terhubung
+                        </span>
+                    </td>
+                    {% if has_permission('edit_master') %}
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 6px;">
+                            <button type="button" class="icon-btn" title="Edit Kategori" onclick="editCategory({{ cat.id }}, '{{ cat.nama_kategori }}')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="m14.5 7.5 3 3"/></svg>
+                            </button>
+                            <a href="{{ url_for('main.delete_category', id=cat.id) }}" class="icon-btn danger" title="Hapus Kategori" onclick="return confirm('Apakah Anda yakin ingin menghapus data kategori ini?')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>
+                            </a>
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 40px; color: var(--slate-400);">Belum ada data kategori barang.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showAddForm() {
+    const p = document.getElementById('categoryEditorPanel');
+    if (!p) return;
+    p.style.display = 'block';
+    document.getElementById('formTitle').innerText = 'Tambah Kategori Baru';
+    document.getElementById('categoryForm').action = "{{ url_for('main.tambah_kategori') }}";
+    document.getElementById('nama_kategori').value = '';
+    document.getElementById('btnSubmit').innerText = 'Simpan Kategori';
+    p.scrollIntoView({ behavior: 'smooth' });
+}
+
+function editCategory(id, nama) {
+    const p = document.getElementById('categoryEditorPanel');
+    if (!p) return;
+    p.style.display = 'block';
+    document.getElementById('formTitle').innerText = 'Edit Kategori: ' + nama;
+    document.getElementById('categoryForm').action = "/categories/edit/" + id;
+    document.getElementById('nama_kategori').value = nama;
+    document.getElementById('btnSubmit').innerText = 'Simpan Perubahan';
+    p.scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelEdit() {
+    const p = document.getElementById('categoryEditorPanel');
+    if (p) p.style.display = 'none';
+}
+</script>
+{% endblock %}

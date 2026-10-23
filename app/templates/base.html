@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Lab Asset Management Workspace{% endblock %}</title>
+    
+    <!-- Google Fonts & Custom Executive Design System -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+    <div class="app-shell">
+        {% if session.get('user_id') %}
+        <!-- Topbar Navigation (Matching Wireframe Redesign) -->
+        <header class="topbar">
+            <a href="{{ url_for('main.dashboard') }}" class="topbar-mark" title="Lab Asset Workspace">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/>
+                    <path d="m4.5 7.8 7.5 4.3 7.5-4.3M12 12v9"/>
+                </svg>
+                <span>LAB ASSET</span>
+            </a>
+
+            <nav class="primary-nav" aria-label="Navigasi Utama">
+                <!-- 2. Halaman Dashboard Utama (HomeView) -->
+                {% if has_permission('view_dashboard') %}
+                <a href="{{ url_for('main.dashboard') }}" class="{% if request.path == url_for('main.dashboard') %}active{% endif %}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 11 9-8 9 8"/><path d="M5 10v11h14V10M9 21v-7h6v7"/></svg>
+                    Beranda
+                </a>
+                {% endif %}
+
+                <!-- 3. Halaman Data Master (DataView — Ruangan, Kategori, Prodi, Kepala Lab) -->
+                {% if has_permission('view_master') %}
+                <a href="{{ url_for('main.locations') }}" class="{% if request.path.startswith('/locations') or request.path.startswith('/categories') or request.path.startswith('/prodi') or request.path.startswith('/kepala-lab') %}active{% endif %}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    Data Master
+                </a>
+                {% endif %}
+
+                <!-- 4. Modul Pengelolaan Data Aset Inventaris (AssetsView) -->
+                {% if has_permission('view_assets') %}
+                <a href="{{ url_for('main.assets') }}" class="{% if request.path.startswith('/assets') or request.path.startswith('/asset/') %}active{% endif %}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4.5 7.8 7.5 4.3 7.5-4.3M12 12v9"/></svg>
+                    Data Aset
+                </a>
+                {% endif %}
+
+                <!-- 5. Halaman Perbaikan & Pemeliharaan Aset (PerbaikanView) -->
+                {% if has_permission('view_perbaikan') %}
+                <a href="{{ url_for('main.perbaikan') }}" class="{% if request.path.startswith('/perbaikan') %}active{% endif %}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                    Perbaikan
+                </a>
+                {% endif %}
+
+                <!-- 6. Halaman Pemetaan Denah 2D Laboratorium (FloorPlanView) -->
+                {% if has_permission('view_floor_plan') %}
+                <a href="{{ url_for('main.floor_plan') }}" class="{% if request.path.startswith('/floor-plan') %}active{% endif %}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9M15 21V9"/></svg>
+                    Pemetaan Denah
+                </a>
+                {% endif %}
+
+                <!-- 7. Halaman Prioritas Penggantian Aset / SAW (SawMethodView) -->
+                {% if has_permission('view_spk') %}
+                <a href="{{ url_for('main.spk') }}" class="{% if request.path.startswith('/spk') %}active{% endif %}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
+                    Prioritas Penggantian
+                </a>
+                {% endif %}
+
+                <!-- 8. Halaman Manajemen Pengguna & Hak Akses (UsersView) -->
+                {% if has_permission('manage_users') %}
+                <a href="{{ url_for('main.users') }}" class="{% if request.path.startswith('/users') %}active{% endif %}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c.7-5 3.4-7 8-7s7.3 2 8 7"/></svg>
+                    Pengguna
+                </a>
+                {% endif %}
+            </nav>
+
+            <div class="utility-nav">
+                <!-- Backup & Restore Database Utility Buttons -->
+                {% if session.get('role') in ['admin', 'Super Admin'] or has_permission('manage_users') %}
+                <a href="{{ url_for('main.backup_db') }}" class="icon-btn" title="Backup Database (.sql)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </a>
+                <button type="button" onclick="document.getElementById('restoreModal').style.display='flex'" class="icon-btn" title="Restore Database (.sql)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </button>
+                {% endif %}
+
+                <!-- User Profile Pill -->
+                <div class="user-badge-pill">
+                    <div class="user-avatar-circle">
+                        {{ (session.get('nama_lengkap') or session.get('username') or 'U')[0] | upper }}
+                    </div>
+                    <div class="user-info-text">
+                        <span class="user-info-name">{{ session.get('nama_lengkap') or session.get('username') }}</span>
+                        <span class="user-info-role">{{ session.get('jabatan') or session.get('role') or 'User' }}</span>
+                    </div>
+                </div>
+
+                <!-- Logout Button -->
+                <a href="{{ url_for('main.logout') }}" class="icon-btn danger" title="Keluar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </a>
+            </div>
+        </header>
+
+        <!-- Modern Modal Dialog Restore Database -->
+        <div id="restoreModal" class="modal-backdrop" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>📥 Restore Basis Data (.sql)</h3>
+                    <button type="button" onclick="document.getElementById('restoreModal').style.display='none'" class="icon-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <form action="{{ url_for('main.restore_db') }}" method="POST" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <p style="margin: 0 0 16px; font-size: 13.5px; color: var(--slate-600); line-height: 1.5;">
+                            Pilih berkas dump <strong>backup_app.sql</strong> untuk memulihkan seluruh tabel data dan otomatis meregenerasi label QR code inventaris.
+                        </p>
+                        <div class="field">
+                            <span>Pilih Berkas SQL *</span>
+                            <input type="file" name="backup_file" accept=".sql" required style="padding: 12px; background: var(--slate-50); border: 2px dashed var(--slate-300);">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" onclick="document.getElementById('restoreModal').style.display='none'" class="btn btn-outline">Batal</button>
+                        <button type="submit" class="btn btn-primary" onclick="return confirm('Peringatan: Pemulihan database akan mengganti dataset saat ini. Lanjutkan?')">Mulai Restore</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Main Content Viewport -->
+        <main class="main-viewport">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="flash-msg {% if category in ['danger', 'error'] %}error{% elif category == 'warning' %}warning{% else %}success{% endif %}">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 16px;">{% if category in ['danger', 'error'] %}⚠️{% elif category == 'warning' %}🔔{% else %}✨{% endif %}</span>
+                    <span>{{ message }}</span>
+                </div>
+                <button type="button" onclick="this.parentElement.remove()" class="flash-close-btn" aria-label="Tutup pesan">&times;</button>
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Executive Footer -->
+        <footer class="app-footer">
+            <span>Ruang Kerja Manajemen Aset Laboratorium</span>
+            <span>Data Inventaris Internal · Terakhir diperbarui hari ini</span>
+        </footer>
+    </div>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

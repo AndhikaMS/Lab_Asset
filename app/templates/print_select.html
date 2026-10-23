@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Cetak Laporan Inventaris · Lab Asset Management{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <!-- Page Heading -->
+    <div class="page-heading">
+        <div>
+            <span class="eyebrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                Pusat Cetak &amp; Laporan
+            </span>
+            <h1>Cetak Laporan Inventaris Aset Lab</h1>
+            <p>Pilih ruangan laboratorium untuk menghasilkan format cetak inventaris resmi bertandatangan Kepala Lab.</p>
+        </div>
+        <div class="heading-actions">
+            <a href="{{ url_for('main.assets') }}" class="btn btn-outline">← Kembali ke Aset</a>
+        </div>
+    </div>
+
+    <section class="panel">
+        <div class="panel-title">
+            <span>Daftar Ruangan Laboratorium Tersedia</span>
+            <span class="badge badge-neutral">{{ locations|length }} Lokasi</span>
+        </div>
+        <div class="panel-body">
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                {% for loc in locations %}
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: var(--radius-md); transition: all var(--transition-fast);" onmouseover="this.style.background='var(--white)'; this.style.borderColor='var(--slate-300)';" onmouseout="this.style.background='var(--slate-50)'; this.style.borderColor='var(--slate-200)';">
+                    <div style="display: flex; align-items: center; gap: 14px;">
+                        <div class="asset-thumb">🏢</div>
+                        <div>
+                            <strong style="display: block; font-size: 14px; color: var(--slate-900);">{{ loc.nama_lab }}</strong>
+                            <small style="color: var(--slate-500); font-size: 12px;">Kode Lab: {{ loc.kode_lab }} · {{ loc.assets|length }} Aset Terdaftar</small>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('main.print_inventory', location_id=loc.id) }}" target="_blank" class="btn btn-cyan btn-sm">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                        Cetak Laporan PDF
+                    </a>
+                </div>
+                {% else %}
+                <div style="text-align: center; padding: 30px; color: var(--slate-400);">Belum ada data laboratorium terdaftar.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
